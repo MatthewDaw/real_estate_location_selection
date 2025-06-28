@@ -1,5 +1,5 @@
 # Use Python 3.11 slim image as base
-FROM python:3.11-slim
+FROM mcr.microsoft.com/playwright:v1.52.0-noble
 
 # Set working directory
 WORKDIR /app
