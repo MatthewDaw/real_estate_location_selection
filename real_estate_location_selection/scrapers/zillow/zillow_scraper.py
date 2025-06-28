@@ -29,6 +29,7 @@ class Zillow(_Scraper):
 
                         if len(batch_entries) >= 100000:
                             self._insert_url_batch(cur, batch_entries, conn)
+                            print(f"updated {len(batch_entries)} zillow url entries")
                             batch_entries.clear()
 
                 if batch_entries:
@@ -212,6 +213,7 @@ class Zillow(_Scraper):
                 urls = self._fetch_urls_to_scrape(cur)
                 batch_entries, urls_to_update = [], []
                 for (url,) in urls:
+                    print(f"extracting zillow url {url}")
                     data = self.extract_from_website(url)
                     if data:
                         safe_data = self._prepare_data_for_db(data)

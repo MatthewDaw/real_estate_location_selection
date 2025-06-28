@@ -25,9 +25,12 @@ def run_home_details_pass():
     scraper.extract_from_website('https://www.zillow.com/homedetails/25-Scenic-Ln-LOT-32-Hartsville-TN-37074/452763936_zpid/')
 
 def run_scraper():
+    print("zillow scraper started")
     browser = get_browser()
     scraper = Zillow(browser)
+    print("preparing zillow scraper tasks")
     scraper.prepare_tasks()
+    print("processing zillow scraper tasks")
     scraper.process_tasks()
     print("pause")
 
