@@ -131,9 +131,12 @@ def prepare_tasks(scraper):
             scraper.prepare_tasks(url, state_abbreviation)
 
 def run_scraper():
+    print("scraper started")
     browser = get_browser()
     scraper = Landwatch(browser)
+    print("preparing tasks")
     prepare_tasks(scraper)
+    print("processing tasks")
     scraper.process_tasks()
 
 if __name__ == '__main__':

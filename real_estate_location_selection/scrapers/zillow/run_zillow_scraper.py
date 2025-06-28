@@ -27,7 +27,7 @@ def run_home_details_pass():
 def run_scraper():
     browser = get_browser()
     scraper = Zillow(browser)
-    # scraper.prepare_tasks()
+    scraper.prepare_tasks()
     scraper.process_tasks()
     print("pause")
 

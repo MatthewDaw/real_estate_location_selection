@@ -52,6 +52,7 @@ class Landwatch(_Scraper):
                         """,
                         url_data
                     )
+                    print(f"Updated {len(url_data)} landwatch_urls")
                     # Single commit for all inserts
                     conn.commit()
                     page += 1
@@ -308,7 +309,9 @@ class Landwatch(_Scraper):
                 cur.execute("SELECT url, state FROM landwatch_urls WHERE scraped_at IS NULL;")
                 for url, state in cur.fetchall():
                     self.close_page()
+                    print(f"extracting details for {url}")
                     data = self.extract_from_website(url, state)
+                    print(f"uploading data for {url}")
                     self.upload_data(data, cur)
                     cur.execute(
                         "UPDATE landwatch_urls SET scraped_at = %s WHERE url = %s;",

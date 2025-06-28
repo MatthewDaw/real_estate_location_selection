@@ -221,8 +221,10 @@ class Zillow(_Scraper):
                     if len(batch_entries) >= 1000:
                         num_added += len(batch_entries)
                         self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
+                        print(f"uploaded zillow property data batch of size {len(batch_entries)}")
                         batch_entries.clear()
                         urls_to_update.clear()
+
                     if num_added > 10000:
                         break
                 if batch_entries:
