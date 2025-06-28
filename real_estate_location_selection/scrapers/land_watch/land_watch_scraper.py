@@ -297,7 +297,7 @@ class Landwatch(_Scraper):
         cursor.execute(insert_sql, data)
         cursor.connection.commit()
 
-    def process_task(self):
+    def process_tasks(self):
         """
         Fetch all URLs from `landwatch_urls` that have not yet been scraped.
         For each, extract data, upload it to the database, and mark the URL as scraped.

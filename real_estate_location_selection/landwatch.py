@@ -18,7 +18,7 @@ def get_browser():
 
 def run_scrape():
     scraper = ApartmentListScraper(browser)
-    details = scraper.process_task("p31370")
+    details = scraper.process_tasks("p31370")
 
 
 

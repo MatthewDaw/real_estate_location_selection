@@ -28,7 +28,7 @@ def run_scraper():
     browser = get_browser()
     scraper = Zillow(browser)
     # scraper.prepare_tasks()
-    scraper.process_task()
+    scraper.process_tasks()
     print("pause")
 
 if __name__ == '__main__':

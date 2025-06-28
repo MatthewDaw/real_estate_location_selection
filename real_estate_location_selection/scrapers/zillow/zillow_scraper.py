@@ -199,7 +199,7 @@ class Zillow(_Scraper):
         ]
         return {k: data.get(k) for k in keys if data.get(k)}
 
-    def process_task(self):
+    def process_tasks(self):
         """
         Process un-scraped property URLs:
         - Extract property details

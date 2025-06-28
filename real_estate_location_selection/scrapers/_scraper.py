@@ -191,7 +191,7 @@ class _Scraper:
         """
         raise Exception("Implement prepare_tasks")
 
-    def process_task(self, input: str):
+    def process_tasks(self, input: str):
         """The return value from this function will be saved to a blob at
             gs://hello-data-rentsource/bulk_data/<folder_id>/<now>.json
         and streamed to BigQuery.
