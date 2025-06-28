@@ -18,3 +18,6 @@ requests==2.32.3
 psycopg==3.2.9
 psycopg-binary==3.2.9
 haversine==2.9.0
+google-cloud-batch==0.17.26
+google-cloud-bigquery==3.25.0
+google-cloud-bigquery-storage==2.25.0
