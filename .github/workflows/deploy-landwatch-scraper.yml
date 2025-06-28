@@ -35,11 +35,11 @@ jobs:
               args: [
                 'build',
                 '--build-arg', 'SCRAPER_PATH=real_estate_location_selection/scrapers/land_watch/run_land_watch_scraper.py',
-                '-t', 'us-central1-docker.pkg.dev/flowing-flame-464314-j5/MatthewDaw-real_estate_location_selection/land-watch-scraper:latest',
+                '-t', 'us-central1-docker.pkg.dev/flowing-flame-464314-j5/real_estate_location_selection/land-watch-scraper:latest',
                 '.'
               ]
             - name: 'gcr.io/cloud-builders/docker'
-              args: ['push', 'us-central1-docker.pkg.dev/flowing-flame-464314-j5/MatthewDaw-real_estate_location_selection/land-watch-scraper:latest']
+              args: ['push', 'us-central1-docker.pkg.dev/flowing-flame-464314-j5/real_estate_location_selection/land-watch-scraper:latest']
           options:
             logging: CLOUD_LOGGING_ONLY
           EOF
