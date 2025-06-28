@@ -30,6 +30,3 @@ ENV SCRAPER_PATH=${SCRAPER_PATH}
 
 # Run the specified scraper
 CMD ["sh", "-c", "uv run ${SCRAPER_PATH}"]
-
-real_estate_location_selection/scrapers/land_watch/run_land_watch_scraper.py
-real_estate_location_selection/scrapers/zillow/run_zillow_scraper.py
