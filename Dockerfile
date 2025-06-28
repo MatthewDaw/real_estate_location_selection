@@ -25,7 +25,7 @@ RUN uv sync
 RUN uv pip install -e .
 
 # Install camoufox browser
-RUN python -m camoufox fetch
+RUN uv run -m camoufox fetch
 
 # Accept build argument for which scraper to run
 ARG SCRAPER_PATH
