@@ -127,7 +127,8 @@ state_abbreviations = [
 
 def prepare_tasks(scraper):
     for url, state_abbreviation in zip(urls, state_abbreviations):
-        scraper.prepare_tasks(url, state_abbreviation)
+        if state_abbreviation == 'UT':
+            scraper.prepare_tasks(url, state_abbreviation)
 
 def run_scraper():
     browser = get_browser()

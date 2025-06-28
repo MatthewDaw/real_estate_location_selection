@@ -206,11 +206,11 @@ class Zillow(_Scraper):
         - Insert them into `zillow_property_details`
         - Update `scraped_at` for the URLs
         """
+        num_added = 0
         with local_db_connection() as conn:
             with conn.cursor() as cur:
                 urls = self._fetch_urls_to_scrape(cur)
                 batch_entries, urls_to_update = [], []
-
                 for (url,) in urls:
                     data = self.extract_from_website(url)
                     if data:
@@ -219,10 +219,12 @@ class Zillow(_Scraper):
                         urls_to_update.append(url)
 
                     if len(batch_entries) >= 1000:
+                        num_added += len(batch_entries)
                         self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
                         batch_entries.clear()
                         urls_to_update.clear()
-
+                    if num_added > 10000:
+                        break
                 if batch_entries:
                     self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
 
