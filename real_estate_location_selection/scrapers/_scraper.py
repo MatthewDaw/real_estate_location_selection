@@ -41,7 +41,7 @@ class _Scraper:
         self.bigquery_client = bigquery.Client()
         self.pubsub_client = pubsub_v1.PublisherClient()
         self.topic_path = self.pubsub_client.topic_path(
-            "hello-data-ai", "scraper-residential-topic"
+            "flowing-flame-464314-j5", "scraper-residential-topic"
         )
         self.now = datetime.now(timezone.utc).date().isoformat()
         self._browser = browser
@@ -68,7 +68,7 @@ class _Scraper:
                 DISTINCT
                 loc,
                 FORMAT_TIMESTAMP("%Y-%m-%dT%X", lastmod) AS lastmod
-            FROM `hello-data-ai.rentsource.sitemap`
+            FROM `flowing-flame-464314-j5.rentsource.sitemap`
             WHERE created_on > "2023-01-01"
                 AND source = '{self.source}';
         """

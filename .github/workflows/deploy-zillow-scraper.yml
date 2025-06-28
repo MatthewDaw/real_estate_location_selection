@@ -1,0 +1,29 @@
+name: Deploy zillow scraper
+
+on:
+  push:
+    paths:
+      - "**"
+    branches: [main]
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: ./
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: "${{ secrets.GCP_CREDENTIALS }}"
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: beta
+      - run: gcloud config set builds/use_kaniko True
+      - run: |
+          gcloud builds submit \
+            --build-arg SCRAPER_PATH=real_estate_location_selection/scrapers/zillow/run_zillow_scraper.py \
+            --tag us-central1-docker.pkg.dev/flowing-flame-464314-j5/zillow-scraper:latest

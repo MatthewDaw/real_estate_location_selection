@@ -8,7 +8,7 @@ from google.cloud import secretmanager
 
 def get_secret(secret_name: str) -> str:
     client = secretmanager.SecretManagerServiceClient()
-    secret_path = f"projects/hello-data-ai/secrets/{secret_name}/versions/latest"
+    secret_path = f"projects/flowing-flame-464314-j5/secrets/{secret_name}/versions/latest"
     response = client.access_secret_version(request={"name": secret_path})
     return response.payload.data.decode("UTF-8")
 

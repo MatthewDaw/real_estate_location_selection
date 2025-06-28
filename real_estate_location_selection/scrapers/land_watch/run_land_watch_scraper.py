@@ -133,7 +133,7 @@ def prepare_tasks(scraper):
 def run_scraper():
     browser = get_browser()
     scraper = Landwatch(browser)
-    # prepare_tasks(scraper)
+    prepare_tasks(scraper)
     scraper.process_tasks()
 
 if __name__ == '__main__':
