@@ -1,4 +1,4 @@
-from connection import hd_connection, local_db_connection
+from real_estate_location_selection.connection import hd_connection, local_db_connection
 
 if __name__ == '__main__':
     # Step 1: Table creation SQL

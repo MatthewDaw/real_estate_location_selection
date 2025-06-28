@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from connection import connection
+from real_estate_location_selection.connection import connection
 import pandas as pd
 import folium
 from folium.plugins import HeatMap

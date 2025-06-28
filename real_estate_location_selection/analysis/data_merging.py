@@ -1,4 +1,4 @@
-from connection import local_db_connection
+from real_estate_location_selection.connection import local_db_connection
 import pandas as pd
 import os
 import numpy as np

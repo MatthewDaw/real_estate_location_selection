@@ -2,7 +2,7 @@ import json
 import re
 from datetime import date
 from bs4 import BeautifulSoup
-from connection import local_db_connection
+from real_estate_location_selection.connection import local_db_connection
 from psycopg.types.json import Json
 from haversine import haversine, Unit
 from real_estate_location_selection.scrapers._scraper import _Scraper
