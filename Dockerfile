@@ -24,12 +24,15 @@ RUN uv sync
 # Install the package in development mode
 RUN uv pip install -e .
 
+# Install camoufox browser
+RUN python -m camoufox fetch
+
 # Accept build argument for which scraper to run
 ARG SCRAPER_PATH
 ENV SCRAPER_PATH=${SCRAPER_PATH}
 
-# DEBUG: List files to see what was copied
-RUN ls -la /app
+# Define environment variable for display
+ENV DISPLAY=:99
 
 # Run the specified scraper
-CMD ["sh", "-c", "uv run ${SCRAPER_PATH}"]
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && uv run ${SCRAPER_PATH}"]
