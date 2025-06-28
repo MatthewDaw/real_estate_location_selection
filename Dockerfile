@@ -28,5 +28,8 @@ RUN uv pip install -e .
 ARG SCRAPER_PATH
 ENV SCRAPER_PATH=${SCRAPER_PATH}
 
+# DEBUG: List files to see what was copied
+RUN ls -la /app
+
 # Run the specified scraper
 CMD ["sh", "-c", "uv run ${SCRAPER_PATH}"]
