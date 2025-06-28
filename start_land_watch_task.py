@@ -4,7 +4,7 @@ import time
 from google.cloud import batch_v1
 
 parent = "projects/flowing-flame-464314-j5/locations/us-west3"
-job_id = "flowing-flame-464314-j5-rentsource-google-place-id-%i" % int(time.time())
+job_id = "flowing-flame-464314-j5-land-watch-collection-%i" % int(time.time())
 request = batch_v1.CreateJobRequest(
     parent=parent,
     job_id=job_id,
@@ -23,15 +23,16 @@ request = batch_v1.CreateJobRequest(
                     runnables=[
                         batch_v1.Runnable(
                             container=batch_v1.Runnable.Container(
-                                image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/apis/flowing-flame-464314-j5-google-place-id:latest"
+                                image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/land-watch-scraper:latest"
                             ),
                             environment=batch_v1.Environment(
                                 variables={
-                                    "DB_HOST": os.getenv("DB_HOST"),
-                                    "DB_NAME": os.getenv("DB_NAME"),
-                                    "DB_USER": os.getenv("DB_USER"),
-                                    "DB_PASS": os.getenv("DB_PASS"),
-                                    "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY"),
+                                    "PERSONAL_GOOGLE_CLOUD_DB_HOST": os.getenv("PERSONAL_GOOGLE_CLOUD_DB_HOST"),
+                                    "PERSONAL_GOOGLE_CLOUD_DB_NAME": os.getenv("PERSONAL_GOOGLE_CLOUD_DB_NAME"),
+                                    "PERSONAL_GOOGLE_CLOUD_DB_USER": os.getenv("PERSONAL_GOOGLE_CLOUD_DB_USER"),
+                                    "PERSONAL_GOOGLE_CLOUD_DB_PASS": os.getenv("PERSONAL_GOOGLE_CLOUD_DB_PASS"),
+                                    "EVOMI_USERNAME": os.getenv("EVOMI_USERNAME"),
+                                    "EVOMI_PASSWORD": os.getenv("EVOMI_PASSWORD"),
                                 }
                             ),
                         )

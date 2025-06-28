@@ -1,5 +1,6 @@
 import logging
 import time
+import os
 
 import requests
 from browserforge.headers import HeaderGenerator
@@ -12,13 +13,16 @@ def get_secret(secret_name: str) -> str:
     response = client.access_secret_version(request={"name": secret_path})
     return response.payload.data.decode("UTF-8")
 
-EVOMI_PASSWORD = get_secret("EVOMI_PASSWORD")
+EVOMI_USERNAME = os.environ.get("EVOMI_USERNAME")
+EVOMI_PASSWORD = os.environ.get("EVOMI_PASSWORD")
 
 class Session:
 
     def __init__(self):
+        self.evomi_username = EVOMI_USERNAME
         self.evomi_pass = EVOMI_PASSWORD
-        proxy = f"http://tim6:{self.evomi_pass}_country-US@core-residential.evomi.com:1000"
+        proxy = f"http://core-residential.evomi.com:1000:{EVOMI_USERNAME}:{EVOMI_PASSWORD}"
+        # proxy = f"http://{EVOMI_USERNAME}:{self.evomi_pass}_country-US@core-residential.evomi.com:1000"
         self.proxies = {"http": proxy, "https": proxy}
         self.hg = HeaderGenerator()
 

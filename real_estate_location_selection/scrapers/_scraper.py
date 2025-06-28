@@ -328,7 +328,7 @@ class _Scraper:
                     ignore_https_errors=True,
                     proxy={
                         "server": "core-residential.evomi.com:1000",
-                        "username": "tim6",
+                        "username": self.session.evomi_username,
                         "password": f"{self.session.evomi_pass}_country-US",
                     },
                 )
