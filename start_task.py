@@ -3,7 +3,7 @@ import time
 
 from google.cloud import batch_v1
 
-parent = "projects/flowing-flame-464314-j5/locations/us-central1"
+parent = "projects/flowing-flame-464314-j5/locations/us-west3"
 job_id = "flowing-flame-464314-j5-rentsource-google-place-id-%i" % int(time.time())
 request = batch_v1.CreateJobRequest(
     parent=parent,
@@ -23,7 +23,7 @@ request = batch_v1.CreateJobRequest(
                     runnables=[
                         batch_v1.Runnable(
                             container=batch_v1.Runnable.Container(
-                                image_uri="us-central1-docker.pkg.dev/flowing-flame-464314-j5/real_estate_location_selection/apis/flowing-flame-464314-j5-google-place-id:latest"
+                                image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real_estate_location_selection/apis/flowing-flame-464314-j5-google-place-id:latest"
                             ),
                             environment=batch_v1.Environment(
                                 variables={
