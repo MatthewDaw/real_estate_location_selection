@@ -11,7 +11,9 @@ RUN apt-get update && apt-get install -y \
 
 # Install UV
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.cargo/bin:$PATH"
+
+# Fix the PATH - UV installs to /root/.local/bin, not /root/.cargo/bin
+ENV PATH="/root/.local/bin:$PATH"
 
 # Copy project files
 COPY . .
