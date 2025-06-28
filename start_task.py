@@ -23,7 +23,7 @@ request = batch_v1.CreateJobRequest(
                     runnables=[
                         batch_v1.Runnable(
                             container=batch_v1.Runnable.Container(
-                                image_uri="us-central1-docker.pkg.dev/flowing-flame-464314-j5/real_estate_location_selection/apis/flowing-flame-464314-j5-google-place-id:latest"
+                                image_uri="us-central1-docker.pkg.dev/flowing-flame-464314-j5/MatthewDaw-real_estate_location_selection/apis/flowing-flame-464314-j5-google-place-id:latest"
                             ),
                             environment=batch_v1.Environment(
                                 variables={
