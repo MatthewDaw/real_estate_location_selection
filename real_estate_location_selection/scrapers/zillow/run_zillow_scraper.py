@@ -1,7 +1,6 @@
 
 from camoufox.sync_api import Camoufox
-from scrapers.land_watch_scraper import Landwatch
-from scrapers.zillow_scraper import Zillow
+from real_estate_location_selection.scrapers.zillow.zillow_scraper import Zillow
 
 
 def get_browser():
@@ -28,7 +27,7 @@ def run_home_details_pass():
 def run_scraper():
     browser = get_browser()
     scraper = Zillow(browser)
-    scraper.prepare_tasks()
+    # scraper.prepare_tasks()
     scraper.process_task()
     print("pause")
 

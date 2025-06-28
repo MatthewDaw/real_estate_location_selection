@@ -26,9 +26,8 @@ def local_db_connection():
     """
     return psycopg.connect(
         port="5432",
-        host=os.getenv("LOCAL_DB_HOST"),
-        dbname=os.getenv("LOCAL_DB_NAME"),
-        user=os.getenv("LOCAL_DB_USER"),
-        password=os.getenv("LOCAL_DB_PASS"),
-        application_name="update-core",
+        host=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_HOST"),
+        dbname=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_NAME"),
+        user=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_USER"),
+        password=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_PASS"),
     )

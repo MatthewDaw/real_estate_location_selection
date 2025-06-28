@@ -12,8 +12,7 @@ from typing import TypedDict
 from google.cloud import bigquery, pubsub_v1
 from playwright.sync_api import Browser, BrowserContext, Page, Request, Route
 
-from utils.session import Session
-
+from real_estate_location_selection.scrapers.utils.session import Session
 
 class Task(TypedDict):
     source: str

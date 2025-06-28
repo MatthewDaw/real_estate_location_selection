@@ -1,8 +1,7 @@
 import json
 import re
-from _scraper import _Scraper
-from connection import local_db_connection
-
+from real_estate_location_selection.scrapers._scraper import _Scraper
+from real_estate_location_selection.connection import local_db_connection
 
 class Zillow(_Scraper):
     source = "zillow"
@@ -219,7 +218,7 @@ class Zillow(_Scraper):
                         batch_entries.append((url, *safe_data))
                         urls_to_update.append(url)
 
-                    if len(batch_entries) >= 2:
+                    if len(batch_entries) >= 1000:
                         self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
                         batch_entries.clear()
                         urls_to_update.clear()

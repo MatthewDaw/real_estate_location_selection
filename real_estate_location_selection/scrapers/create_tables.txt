@@ -61,7 +61,7 @@ CREATE TABLE landwatch_properties (
 
 
 CREATE TABLE landwatch_urls (
-    url TEXT NOT NULL,
+    url TEXT NOT NULL UNIQUE,
     created_on DATE DEFAULT CURRENT_DATE,
     scraped_at DATE DEFAULT NULL,
     state CHAR(2) DEFAULT NULL

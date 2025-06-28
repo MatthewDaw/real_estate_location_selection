@@ -1,6 +1,7 @@
 
 from camoufox.sync_api import Camoufox
-from scrapers.land_watch_scraper import Landwatch
+from real_estate_location_selection.scrapers.land_watch.land_watch_scraper import Landwatch
+
 
 def get_browser():
     browser = Camoufox(
@@ -132,8 +133,7 @@ def run_scraper():
     browser = get_browser()
     scraper = Landwatch(browser)
     prepare_tasks(scraper)
-    # scraper.process_task()
-    # scraper.extract_from_website('https://www.landwatch.com/utah-county-utah-farms-and-ranches-for-sale/pid/419387663', 'UT')
+    scraper.process_task()
 
 if __name__ == '__main__':
     run_scraper()

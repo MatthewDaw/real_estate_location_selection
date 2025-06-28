@@ -2,11 +2,10 @@ import json
 import re
 from datetime import date
 from bs4 import BeautifulSoup
-from _scraper import _Scraper
 from connection import local_db_connection
 from psycopg.types.json import Json
 from haversine import haversine, Unit
-
+from real_estate_location_selection.scrapers._scraper import _Scraper
 
 class Landwatch(_Scraper):
     """
@@ -41,18 +40,19 @@ class Landwatch(_Scraper):
                     links = [a["href"] for a in soup.find_all("a", href=True) if "/pid/" in a["href"]]
                     if not links:
                         break
-
-                    for link in links:
-                        full_url = f"https://www.landwatch.com{link}"
-                        cur.execute(
-                            """
-                            INSERT INTO landwatch_urls (url, state)
-                            VALUES (%s, %s)
-                            ON CONFLICT (url) DO NOTHING;
-                            """,
-                            (full_url, state_abbr),
-                        )
-                        print(f"Inserted: {full_url} with state: {state_abbr}")
+                    url_data = [
+                        (f"https://www.landwatch.com{link}", state_abbr)
+                        for link in links
+                    ]
+                    # Bulk insert all URLs at once
+                    cur.executemany(
+                        """
+                        INSERT INTO landwatch_urls (url, state)
+                        VALUES (%s, %s) ON CONFLICT (url) DO NOTHING;
+                        """,
+                        url_data
+                    )
+                    # Single commit for all inserts
                     conn.commit()
                     page += 1
 
