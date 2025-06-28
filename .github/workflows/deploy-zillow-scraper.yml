@@ -35,11 +35,11 @@ jobs:
               args: [
                 'build',
                 '--build-arg', 'SCRAPER_PATH=real_estate_location_selection/scrapers/zillow/run_zillow_scraper.py',
-                '-t', 'us-west3-docker.pkg.dev/flowing-flame-464314-j5/real_estate_location_selection/zillow-scraper:latest',
+                '-t', 'us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest',
                 '.'
               ]
             - name: 'gcr.io/cloud-builders/docker'
-              args: ['push', 'us-west3-docker.pkg.dev/flowing-flame-464314-j5/real_estate_location_selection/zillow-scraper:latest']
+              args: ['push', 'us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest']
           options:
             logging: CLOUD_LOGGING_ONLY
           EOF
