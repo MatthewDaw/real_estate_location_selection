@@ -135,7 +135,7 @@ def run_scraper():
     browser = get_browser()
     scraper = Landwatch(browser)
     print("preparing tasks")
-    prepare_tasks(scraper)
+    # prepare_tasks(scraper)
     print("processing tasks")
     scraper.process_tasks()
 
