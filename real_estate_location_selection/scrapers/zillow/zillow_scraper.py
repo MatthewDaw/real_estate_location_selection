@@ -242,285 +242,90 @@ class Zillow(_Scraper):
         ]
         return {k: data.get(k) for k in keys if data.get(k)}
 
-    def process_tasks(self, batches_per_connection=50, max_properties=1000):
-        """
-        Process un-scraped property URLs with connection resets:
-        - Extract property details
-        - Insert them into `zillow_property_details`
-        - Update `scraped_at` for the URLs
-
-        Args:
-            batches_per_connection (int): Number of batches to process before resetting connection (default: 50).
-            max_properties (int): Maximum number of properties to process (default: 10000).
-        """
-        num_added = 0
-        batch_size = 1000
-        batches_in_current_connection = 0
-        total_batches_processed = 0
-
-        conn = None
-        cur = None
-
-        try:
-            while num_added < max_properties:
-                # Open new connection if needed
-                if conn is None or batches_in_current_connection >= batches_per_connection:
-                    if conn:
-                        conn.close()
-                        print(f"Connection reset after {batches_in_current_connection} batches")
-
-                    conn = local_db_connection()
-                    cur = conn.cursor()
-                    batches_in_current_connection = 0
-
-                # Fetch URLs for this connection session
-                urls = self._fetch_urls_to_scrape(cur)
-                if not urls:
-                    print("No more URLs to scrape")
-                    break
-
-                batch_entries, urls_to_update = [], []
-
-                for (url,) in urls:
-                    print(f"extracting zillow url {url}")
-                    data = self.extract_from_website(url)
-                    if data:
-                        safe_data = self._prepare_data_for_db(data)
-                        batch_entries.append((url, *safe_data))
-                        urls_to_update.append(url)
-
-                    # Process batch when it reaches size limit
-                    if len(batch_entries) >= batch_size:
-                        num_added += len(batch_entries)
-                        self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
-                        print(f"uploaded zillow property data batch of size {len(batch_entries)} (total: {num_added})")
-                        batch_entries.clear()
-                        urls_to_update.clear()
-                        batches_in_current_connection += 1
-                        total_batches_processed += 1
-
-                    # Check if we've reached the limit
-                    if num_added >= max_properties:
-                        break
-
-                # Process remaining entries in this batch
-                if batch_entries:
-                    num_added += len(batch_entries)
-                    self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
-                    print(f"uploaded zillow property data batch of size {len(batch_entries)} (total: {num_added})")
-                    batches_in_current_connection += 1
-                    total_batches_processed += 1
-
-                # If we processed fewer URLs than expected, we might be done
-                if len(urls) < batch_size:
-                    print("Fewer URLs returned than expected, likely finished")
-                    break
-
-        finally:
-            if conn:
-                conn.close()
-
-        print(f"Processing complete. Total properties added: {num_added}, Total batches: {total_batches_processed}")
-
-    # Alternative version that fetches URLs in chunks to avoid refetching
-    def process_tasks_chunked(self, batches_per_connection=50, max_properties=10000, url_fetch_size=5000):
-        """
-        Version that fetches URLs in larger chunks to avoid repeated database queries.
-
-        Args:
-            batches_per_connection (int): Number of batches before connection reset.
-            max_properties (int): Maximum properties to process.
-            url_fetch_size (int): Number of URLs to fetch at once (default: 5000).
-        """
-        num_added = 0
-        batch_size = 1000
-        batches_in_current_connection = 0
-        total_batches_processed = 0
-
-        # Get initial batch of URLs
-        with local_db_connection() as temp_conn:
-            with temp_conn.cursor() as temp_cur:
-                all_urls = self._fetch_urls_to_scrape(temp_cur, limit=url_fetch_size)
-
-        if not all_urls:
-            print("No URLs to scrape")
-            return
-
-        url_index = 0
-        conn = None
-        cur = None
-
-        try:
-            while num_added < max_properties and url_index < len(all_urls):
-                # Open new connection if needed
-                if conn is None or batches_in_current_connection >= batches_per_connection:
-                    if conn:
-                        conn.close()
-                        print(f"Connection reset after {batches_in_current_connection} batches")
-
-                    conn = local_db_connection()
-                    cur = conn.cursor()
-                    batches_in_current_connection = 0
-
-                batch_entries, urls_to_update = [], []
-
-                # Process URLs until we have a full batch or run out
-                while len(batch_entries) < batch_size and url_index < len(all_urls) and num_added < max_properties:
-                    url = all_urls[url_index][0]
-                    url_index += 1
-
-                    print(f"extracting zillow url {url}")
-                    data = self.extract_from_website(url)
-                    if data:
-                        safe_data = self._prepare_data_for_db(data)
-                        batch_entries.append((url, *safe_data))
-                        urls_to_update.append(url)
-
-                # Process the batch
-                if batch_entries:
-                    num_added += len(batch_entries)
-                    self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
-                    print(
-                        f"uploaded zillow property data batch of size {len(batch_entries)} (total: {num_added}/{max_properties})")
-                    batches_in_current_connection += 1
-                    total_batches_processed += 1
-
-                # Fetch more URLs if we're running low
-                if url_index >= len(all_urls) and num_added < max_properties:
-                    print("Fetching more URLs...")
-                    with local_db_connection() as temp_conn:
-                        with temp_conn.cursor() as temp_cur:
-                            additional_urls = self._fetch_urls_to_scrape(temp_cur, limit=url_fetch_size)
-                            if additional_urls:
-                                all_urls.extend(additional_urls)
-                            else:
-                                print("No more URLs available")
-                                break
-
-        finally:
-            if conn:
-                conn.close()
-
-        print(f"Processing complete. Total properties added: {num_added}, Total batches: {total_batches_processed}")
-
     # Version with progress persistence for resumability
-    def process_tasks_resumable(self, batches_per_connection=50, max_properties=10000, start_offset=0):
+    def process_tasks(self, batches_per_connection=3, max_properties=10000, start_offset=0):
         """
-        Version with progress tracking that can resume from a specific offset.
-
-        Args:
-            batches_per_connection (int): Number of batches before connection reset.
-            max_properties (int): Maximum properties to process.
-            start_offset (int): Number of properties to skip (for resuming).
+        Cleaner version with proper generator handling.
         """
         num_added = 0
-        num_processed = start_offset  # Track total processed including skipped
-        batch_size = 1000
-        batches_in_current_connection = 0
+        num_processed = start_offset
+        batch_size = 10
         total_batches_processed = 0
-
-        conn = None
-        cur = None
 
         try:
             while num_added < max_properties:
-                # Open new connection if needed
-                if conn is None or batches_in_current_connection >= batches_per_connection:
-                    if conn:
-                        conn.close()
-                        print(f"Connection reset after {batches_in_current_connection} batches")
+                batches_in_connection = 0
 
-                    conn = local_db_connection()
-                    cur = conn.cursor()
-                    batches_in_current_connection = 0
+                for conn in local_db_connection():
+                    with conn.cursor() as cur:
+                        while (batches_in_connection < batches_per_connection and
+                               num_added < max_properties):
 
-                # Fetch URLs with offset
-                urls = self._fetch_urls_to_scrape(cur, offset=num_processed)
-                if not urls:
-                    print("No more URLs to scrape")
-                    break
+                            # Get URLs to process
+                            urls = self._fetch_urls_to_scrape(cur, limit=batch_size, offset=num_processed)
+                            if not urls:
+                                print("No more URLs to scrape")
+                                return
 
-                batch_entries, urls_to_update = [], []
+                            batch_entries, urls_to_update = [], []
 
-                for (url,) in urls:
-                    num_processed += 1
+                            for (url,) in urls:
+                                num_processed += 1
 
-                    # Skip if we haven't reached our starting point
-                    if num_processed <= start_offset:
-                        continue
+                                print(f"extracting zillow url {url} (processed: {num_processed}, added: {num_added})")
 
-                    print(f"extracting zillow url {url} (processed: {num_processed}, added: {num_added})")
+                                try:
+                                    data = self.extract_from_website(url)
+                                    if data:
+                                        safe_data = self._prepare_data_for_db(data)
+                                        batch_entries.append((url, *safe_data))
+                                        urls_to_update.append(url)
+                                except Exception as e:
+                                    print(f"Error processing URL {url}: {e}")
+                                    continue
 
-                    try:
-                        data = self.extract_from_website(url)
-                        if data:
-                            safe_data = self._prepare_data_for_db(data)
-                            batch_entries.append((url, *safe_data))
-                            urls_to_update.append(url)
-                    except Exception as e:
-                        print(f"Error processing URL {url}: {e}")
-                        # Continue with next URL instead of failing completely
-                        continue
+                            # Insert the batch
+                            if batch_entries:
+                                num_added += len(batch_entries)
+                                self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
+                                print(f"uploaded batch of {len(batch_entries)} (total added: {num_added})")
+                                batches_in_connection += 1
+                                total_batches_processed += 1
 
-                    # Process batch when it reaches size limit
-                    if len(batch_entries) >= batch_size:
-                        num_added += len(batch_entries)
-                        self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
-                        print(
-                            f"uploaded batch of {len(batch_entries)} (total added: {num_added}, processed: {num_processed})")
-                        batch_entries.clear()
-                        urls_to_update.clear()
-                        batches_in_current_connection += 1
-                        total_batches_processed += 1
+                            # If we got fewer URLs than requested, we're done
+                            if len(urls) < batch_size:
+                                print("Reached end of available URLs")
+                                return
 
-                    # Check if we've reached the limit
-                    if num_added >= max_properties:
-                        break
-
-                # Process remaining entries
-                if batch_entries:
-                    num_added += len(batch_entries)
-                    self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
-                    print(f"uploaded final batch of {len(batch_entries)} (total added: {num_added})")
-                    batches_in_current_connection += 1
-                    total_batches_processed += 1
+                print(f"Connection reset after {batches_in_connection} batches")
 
         except Exception as e:
             print(f"Error during processing: {e}")
-            print(
-                f"You can resume from offset {num_processed} by calling process_tasks_resumable(start_offset={num_processed})")
+            print(f"Resume with: process_tasks_clean(start_offset={num_processed})")
             raise
-        finally:
-            if conn:
-                conn.close()
 
-        print(
-            f"Processing complete. Properties added: {num_added}, Total processed: {num_processed}, Batches: {total_batches_processed}")
+        print(f"Complete: {num_added} added, {num_processed} processed, {total_batches_processed} batches")
 
-    # Helper method modification for chunked version
-    def _fetch_urls_to_scrape(self, cur, limit=None, offset=0):
+    # Updated helper method to support limit properly
+    def _fetch_urls_to_scrape(self, cur, limit=1000, offset=0):
         """
-        Modified helper to support limit and offset parameters.
+        Fetch URLs to scrape with proper limit and offset support.
 
         Args:
             cur: Database cursor
             limit (int): Maximum number of URLs to fetch
             offset (int): Number of URLs to skip
         """
-        query = "SELECT url FROM zillow_urls WHERE scraped_at IS NULL ORDER BY id"
-        params = []
-
-        if limit:
-            query += " LIMIT %s"
-            params.append(limit)
-
-        if offset:
-            query += " OFFSET %s"
-            params.append(offset)
-
-        cur.execute(query, params)
+        query = """
+                SELECT url
+                FROM zillow_urls
+                WHERE scraped_at IS NULL
+                ORDER BY id
+                    LIMIT %s \
+                OFFSET %s \
+                """
+        cur.execute(query, (limit, offset))
         return cur.fetchall()
-
     def _prepare_data_for_db(self, data):
         """
         Prepares property details for DB insertion:
