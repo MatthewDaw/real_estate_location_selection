@@ -243,7 +243,7 @@ class Zillow(_Scraper):
         return {k: data.get(k) for k in keys if data.get(k)}
 
     # Version with progress persistence for resumability
-    def process_tasks(self, batches_per_connection=3, max_properties=10000, start_offset=0):
+    def process_tasks(self, batches_per_connection=1, max_properties=10000, start_offset=0):
         """
         Cleaner version with proper generator handling.
         """
@@ -273,13 +273,12 @@ class Zillow(_Scraper):
                                 num_processed += 1
 
                                 print(f"extracting zillow url {url} (processed: {num_processed}, added: {num_added})")
-
+                                urls_to_update.append(url)
                                 try:
                                     data = self.extract_from_website(url)
                                     if data:
                                         safe_data = self._prepare_data_for_db(data)
                                         batch_entries.append((url, *safe_data))
-                                        urls_to_update.append(url)
                                 except Exception as e:
                                     print(f"Error processing URL {url}: {e}")
                                     continue
