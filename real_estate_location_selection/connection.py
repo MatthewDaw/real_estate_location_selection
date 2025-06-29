@@ -13,9 +13,9 @@ def wait_for_database(max_attempts=30):
             conn = psycopg.connect(
                 host=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_HOST"),
                 port=5432,
-                dbname=os.environ['DB_NAME'],
-                user=os.environ['DB_USER'],
-                password=os.environ['DB_PASSWORD'],
+                dbname=os.environ['PERSONAL_GOOGLE_CLOUD_DB_NAME'],
+                user=os.environ['PERSONAL_GOOGLE_CLOUD_DB_USER'],
+                password=os.environ['PERSONAL_GOOGLE_CLOUD_DB_PASS'],
                 connect_timeout=5
             )
             conn.close()
