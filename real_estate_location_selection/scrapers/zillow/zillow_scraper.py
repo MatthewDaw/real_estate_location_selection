@@ -203,12 +203,15 @@ class Zillow(_Scraper):
         if climate_data:
             for risk_name, risk in climate_data.items():
                 if 'primary' in risk:
-                    risks[risk_name] = {
-                        'probability': risk['primary'].get('probability'),
-                        'risk_label': risk['primary']['riskScore'].get('label'),
-                        'risk_value': risk['primary']['riskScore'].get('value'),
-                        'risk_value_out_of': risk['primary']['riskScore'].get('max'),
-                    }
+                    primary = risk.get('primary', {})
+                    if primary:
+                        risk_score = primary.get('riskScore') if isinstance(primary.get('riskScore'), dict) else {}
+                        risks[risk_name] = {
+                            'probability': primary.get('probability'),
+                            'risk_label': risk_score.get('label'),
+                            'risk_value': risk_score.get('value'),
+                            'risk_value_out_of': risk_score.get('max'),
+                        }
         return risks
 
     def _flatten_home_insights(self, home_insights):
@@ -273,12 +276,12 @@ class Zillow(_Scraper):
                                 num_processed += 1
 
                                 print(f"extracting zillow url {url} (processed: {num_processed}, added: {num_added})")
-                                urls_to_update.append(url)
                                 try:
                                     data = self.extract_from_website(url)
                                     if data:
                                         safe_data = self._prepare_data_for_db(data)
                                         batch_entries.append((url, *safe_data))
+                                        urls_to_update.append(url)
                                 except Exception as e:
                                     print(f"Error processing URL {url}: {e}")
                                     continue
@@ -301,7 +304,7 @@ class Zillow(_Scraper):
         except Exception as e:
             print(f"Error during processing: {e}")
             print(f"Resume with: process_tasks_clean(start_offset={num_processed})")
-            raise
+            raise e
 
         print(f"Complete: {num_added} added, {num_processed} processed, {total_batches_processed} batches")
 
@@ -325,6 +328,7 @@ class Zillow(_Scraper):
                 """
         cur.execute(query, (limit, offset))
         return cur.fetchall()
+
     def _prepare_data_for_db(self, data):
         """
         Prepares property details for DB insertion:
@@ -419,4 +423,3 @@ class Zillow(_Scraper):
             self.set_property_website(gdp)
             return gdp
         return {}
-
