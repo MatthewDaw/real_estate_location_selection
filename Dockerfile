@@ -15,6 +15,10 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 # Fix the PATH - UV installs to /root/.local/bin, not /root/.cargo/bin
 ENV PATH="/root/.local/bin:$PATH"
 
+# Python environment variables for proper logging
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
+
 # Copy project files
 COPY . .
 
@@ -34,5 +38,5 @@ ENV SCRAPER_PATH=${SCRAPER_PATH}
 # Define environment variable for display
 ENV DISPLAY=:99
 
-# Run the specified scraper
-CMD ["sh", "-c", "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && uv run ${SCRAPER_PATH}"]
+# Run the specified scraper with output redirection
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && uv run ${SCRAPER_PATH} 2>&1"]
