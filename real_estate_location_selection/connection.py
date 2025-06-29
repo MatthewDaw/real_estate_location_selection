@@ -10,7 +10,7 @@ def local_db_connection():
     """
     return psycopg.connect(
         port="5432",
-        host=os.getenv("INSTANCE_UNIX_SOCKET") or os.getenv("PERSONAL_GOOGLE_CLOUD_DB_HOST"),
+        host=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_HOST"),
         dbname=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_NAME"),
         user=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_USER"),
         password=os.getenv("PERSONAL_GOOGLE_CLOUD_DB_PASS"),

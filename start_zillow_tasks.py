@@ -21,20 +21,6 @@ request = batch_v1.CreateJobRequest(
                     ),
                     max_retry_count=10,
                     runnables=[
-                        # Cloud SQL Proxy - runs in background
-                        batch_v1.Runnable(
-                            container=batch_v1.Runnable.Container(
-                                image_uri="gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0",
-                                commands=[
-                                    "/cloud-sql-proxy",
-                                    "--structured-logs",
-                                    "--unix-socket=/cloudsql",
-                                    "flowing-flame-464314-j5:us-west3:matt-sandbox"
-                                ]
-                            ),
-                            background=True  # Critical: runs in background
-                        ),
-                        # Your application - runs in foreground
                         batch_v1.Runnable(
                             container=batch_v1.Runnable.Container(
                                 image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest"
@@ -47,17 +33,10 @@ request = batch_v1.CreateJobRequest(
                                     "PERSONAL_GOOGLE_CLOUD_DB_PASS": os.getenv("PERSONAL_GOOGLE_CLOUD_DB_PASS"),
                                     "EVOMI_USERNAME": os.getenv("EVOMI_USERNAME"),
                                     "EVOMI_PASSWORD": os.getenv("EVOMI_PASSWORD"),
-                                    "INSTANCE_UNIX_SOCKET": "/cloudsql/flowing-flame-464314-j5:us-west3:matt-sandbox",
                                 }
                             ),
                         )
                     ],
-                    # Add shared volume for the Unix socket
-                    volumes=[
-                        batch_v1.Volume(
-                            mount_path="/cloudsql"
-                        )
-                    ]
                 ),
             )
         ],
@@ -74,7 +53,6 @@ request = batch_v1.CreateJobRequest(
         logs_policy=batch_v1.LogsPolicy(destination="CLOUD_LOGGING"),
     ),
 )
-
 client = batch_v1.BatchServiceClient()
 response = client.create_job(request=request)
 print(response)
