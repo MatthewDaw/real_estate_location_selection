@@ -33,6 +33,7 @@ request = batch_v1.CreateJobRequest(
                                     "PERSONAL_GOOGLE_CLOUD_DB_PASS": os.getenv("PERSONAL_GOOGLE_CLOUD_DB_PASS"),
                                     "EVOMI_USERNAME": os.getenv("EVOMI_USERNAME"),
                                     "EVOMI_PASSWORD": os.getenv("EVOMI_PASSWORD"),
+                                    "INSTANCE_CONNECTION_NAME":"flowing-flame-464314-j5:us-central1:matt-sandbox"
                                 }
                             ),
                         )
