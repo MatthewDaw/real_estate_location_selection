@@ -91,7 +91,7 @@ def get_data(force_refresh=False):
     """
 
     # Execute both queries
-    with local_db_connection() as conn:
+    for conn in local_db_connection():
         lot_prices_df = pd.read_sql(filtered_properties_query, conn)
         unit_rent_df = pd.read_sql(unit_prices_query, conn)
 

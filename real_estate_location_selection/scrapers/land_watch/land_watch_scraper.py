@@ -16,46 +16,55 @@ class Landwatch(_Scraper):
     use_proxies_camoufox = False
     use_resource_intercept = False
 
-    def prepare_tasks(self, state_source, state_abbreviation):
+    def prepare_tasks(self, state_source, state_abbreviation, pages_per_batch=25):
         """
-        Crawl paginated listing pages for a specific state on LandWatch,
-        extract property links, and insert them into the `landwatch_urls` table
-        if they don't already exist.
+        Version with configurable batch size for connection resets.
 
         Args:
             state_source (str): The URL path for the state (e.g., "/texas-land-for-sale").
             state_abbreviation (str): The 2-letter abbreviation of the state (e.g., "TX").
+            pages_per_batch (int): Number of pages to process before resetting connection (default: 50).
         """
         page = 1
         state_abbr = state_abbreviation.upper()
 
-        with local_db_connection() as conn:
-            with conn.cursor() as cur:
-                while True:
-                    url = f"https://www.landwatch.com{state_source}/page-{page}"
-                    self.close_page()
-                    self.goto_url(url)
+        while True:
+            batch_start_page = page
 
-                    soup = BeautifulSoup(self.page.content(), "html.parser")
-                    links = [a["href"] for a in soup.find_all("a", href=True) if "/pid/" in a["href"]]
-                    if not links:
-                        break
-                    url_data = [
-                        (f"https://www.landwatch.com{link}", state_abbr)
-                        for link in links
-                    ]
-                    # Bulk insert all URLs at once
-                    cur.executemany(
-                        """
-                        INSERT INTO landwatch_urls (url, state)
-                        VALUES (%s, %s) ON CONFLICT (url) DO NOTHING;
-                        """,
-                        url_data
-                    )
-                    print(f"Updated {len(url_data)} landwatch_urls")
-                    # Single commit for all inserts
-                    conn.commit()
-                    page += 1
+            for conn in local_db_connection():
+                with conn.cursor() as cur:
+                    batch_processed = 0
+
+                    while batch_processed < pages_per_batch:
+                        url = f"https://www.landwatch.com{state_source}/page-{page}"
+                        self.close_page()
+                        self.goto_url(url)
+
+                        soup = BeautifulSoup(self.page.content(), "html.parser")
+                        links = [a["href"] for a in soup.find_all("a", href=True) if "/pid/" in a["href"]]
+
+                        if not links:
+                            print(f"No more links found at page {page}. Ending crawl.")
+                            print(f"Final batch: processed {batch_processed} pages ({batch_start_page}-{page - 1})")
+                            return
+
+                        url_data = [
+                            (f"https://www.landwatch.com{link}", state_abbr)
+                            for link in links
+                        ]
+
+                        cur.executemany(
+                            """
+                            INSERT INTO landwatch_urls (url, state)
+                            VALUES (%s, %s) ON CONFLICT (url) DO NOTHING;
+                            """,
+                            url_data
+                        )
+                        print(f"Page {page}: Updated {len(url_data)} landwatch_urls")
+                        conn.commit()
+
+                        page += 1
+                        batch_processed += 1
 
     def _extract_location_parts_from_url(self, url: str):
         """
@@ -298,24 +307,39 @@ class Landwatch(_Scraper):
         cursor.execute(insert_sql, data)
         cursor.connection.commit()
 
+    def get_unscraped_urls_paginated(self, cur, page_size=25):
+        cur.execute("""
+                    SELECT url, state
+                    FROM landwatch_urls
+                    WHERE scraped_at IS NULL
+                    ORDER BY url -- Important: always use ORDER BY with pagination
+                        LIMIT %s
+                    """, (page_size,))
+        return cur.fetchall()
+
     def process_tasks(self):
         """
         Fetch all URLs from `landwatch_urls` that have not yet been scraped.
         For each, extract data, upload it to the database, and mark the URL as scraped.
         """
-        today = date.today()
-        with local_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT url, state FROM landwatch_urls WHERE scraped_at IS NULL;")
-                for url, state in cur.fetchall():
-                    self.close_page()
-                    print(f"extracting details for {url}")
-                    data = self.extract_from_website(url, state)
-                    print(f"uploading data for {url}")
-                    self.upload_data(data, cur)
-                    cur.execute(
-                        "UPDATE landwatch_urls SET scraped_at = %s WHERE url = %s;",
-                        (today, url),
-                    )
-                    conn.commit()
-                    print(f"Updated scraped_at for: {url}")
+        is_complete = False
+        while not is_complete:
+            today = date.today()
+            for conn in local_db_connection():
+                with conn.cursor() as cur:
+                    results = self.get_unscraped_urls_paginated(cur)
+                    if not results:
+                        is_complete = True
+                        break
+                    for url, state in results:
+                        self.close_page()
+                        print(f"extracting details for {url}")
+                        data = self.extract_from_website(url, state)
+                        print(f"uploading data for {url}")
+                        self.upload_data(data, cur)
+                        cur.execute(
+                            "UPDATE landwatch_urls SET scraped_at = %s WHERE url = %s;",
+                            (today, url),
+                        )
+                        conn.commit()
+                        print(f"Updated scraped_at for: {url}")
