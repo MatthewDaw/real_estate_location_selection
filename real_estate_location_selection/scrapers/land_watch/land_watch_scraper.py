@@ -1,11 +1,12 @@
 import json
-import re
-from datetime import date
 from bs4 import BeautifulSoup
 from real_estate_location_selection.connection import local_db_connection
-from psycopg.types.json import Json
 from haversine import haversine, Unit
 from real_estate_location_selection.scrapers._scraper import _Scraper
+import re
+from datetime import date
+from psycopg.types.json import Json
+from real_estate_location_selection.scrapers.utils.common_functions import safe_get, safe_lower, safe_divide
 
 class Landwatch(_Scraper):
     """
@@ -138,10 +139,11 @@ class Landwatch(_Scraper):
 
         # Coordinates
         prop_coords = (prop_data["latitude"], prop_data["longitude"])
-        city_coords = (prop_data["city"]["latitude"], prop_data["city"]["longitude"])
+        city = prop_data["city"] if prop_data["city"] else {}
+        city_coords = (city.get("latitude"), city.get("longitude"))
 
         # Compute distance
-        if prop_data["latitude"] and prop_data["longitude"] and prop_data["city"]["latitude"] and prop_data["city"]["longitude"]:
+        if prop_data["latitude"] and prop_data["longitude"] and city.get("latitude") and city.get("longitude"):
             distance_to_city = haversine(prop_coords, city_coords, unit=Unit.MILES)
         else:
             distance_to_city = None
@@ -149,39 +151,44 @@ class Landwatch(_Scraper):
         homesqrt = state["propertyDetailPage"]["propertyData"].get("homesqft") if state else None
         return {
             # Location
-            'state': prop_data["address"]['stateAbbreviation'],
-            'city': prop_data["address"]["city"].lower(),
-            'zip': prop_data["address"].get('zip'),
-            'address1': prop_data["address"]['address1'].lower(),
-            'address2': prop_data["address"]['address2'].lower(),
-            'latitude': prop_data["latitude"],
-            'longitude': prop_data["longitude"],
-            'city_latitude': prop_data["city"]["latitude"],
-            'city_longitude': prop_data["city"]["longitude"],
+            'state': safe_get(prop_data, "address", 'stateAbbreviation'),
+            'city': safe_lower(safe_get(prop_data, "address", "city")),
+            'zip': safe_get(prop_data, "address", 'zip'),
+            'address1': safe_lower(safe_get(prop_data, "address", 'address1')),
+            'address2': safe_lower(safe_get(prop_data, "address", 'address2')),
+            'latitude': safe_get(prop_data, "latitude"),
+            'longitude': safe_get(prop_data, "longitude"),
+            'city_latitude': safe_get(city, "latitude") if city else None,
+            'city_longitude': safe_get(city, "longitude") if city else None,
+
             # Property characteristics
-            'acres': prop_data["acres"],
-            'beds': prop_data["beds"],
-            'baths': prop_data["baths"],
+            'acres': safe_get(prop_data, "acres"),
+            'beds': safe_get(prop_data, "beds"),
+            'baths': safe_get(prop_data, "baths"),
             'homesqft': homesqrt,
-            'property_types': state["propertyDetailPage"]["propertyData"].get('types') if state else None,
-            'is_irrigated': prop_data["isIrrigated"],
-            'is_residence': prop_data["isResidence"],
+            'property_types': safe_get(state, "propertyDetailPage", "propertyData", 'types') if state else None,
+            'is_irrigated': safe_get(prop_data, "isIrrigated"),
+            'is_residence': safe_get(prop_data, "isResidence"),
+
             # Listing details
-            'price': prop_data["price"],
-            'listing_date': prop_data["listingDate"],
+            'price': safe_get(prop_data, "price"),
+            'listing_date': safe_get(prop_data, "listingDate"),
+
             # Marketing & metadata
-            'title': prop_data["title"],
-            'description': prop_data["description"],
-            'executive_summary': prop_data["executiveSummary"],
+            'title': safe_get(prop_data, "title"),
+            'description': safe_get(prop_data, "description"),
+            'executive_summary': safe_get(prop_data, "executiveSummary"),
+
             # Badging
-            'is_diamond': prop_data["isDiamond"],
-            'is_gold': prop_data["isGold"],
-            'is_platinum': prop_data["isPlatinum"],
-            'is_showcase': prop_data["isShowcase"],
+            'is_diamond': safe_get(prop_data, "isDiamond"),
+            'is_gold': safe_get(prop_data, "isGold"),
+            'is_platinum': safe_get(prop_data, "isPlatinum"),
+            'is_showcase': safe_get(prop_data, "isShowcase"),
+
             # Computed Fields
-            'cost_per_acre': prop_data["price"] / prop_data['acres'] if prop_data['acres'] and prop_data["price"] and prop_data["price"] > 0 else None,
+            'cost_per_acre': safe_divide(safe_get(prop_data, "price"), safe_get(prop_data, 'acres')),
             'distance_to_city_miles': distance_to_city,
-            'cost_per_homesqft': prop_data["price"] / homesqrt if prop_data["price"] and homesqrt and homesqrt > 0 else None,
+            'cost_per_homesqft': safe_divide(safe_get(prop_data, "price"), homesqrt),
         }
 
     def _extract_lot_info(self, soup, page_source):
@@ -266,14 +273,61 @@ class Landwatch(_Scraper):
         **property_info,
     }
 
+
+
+    def clean_unicode_surrogates(self, text):
+        """
+        Remove or replace invalid Unicode surrogate characters that can't be encoded to UTF-8.
+
+        Args:
+            text: String that may contain invalid surrogates
+
+        Returns:
+            Cleaned string safe for UTF-8 encoding
+        """
+        if not isinstance(text, str):
+            return text
+
+        # Method 1: Remove surrogates entirely
+        # return text.encode('utf-8', 'ignore').decode('utf-8')
+
+        # Method 2: Replace surrogates with replacement character
+        return text.encode('utf-8', 'replace').decode('utf-8')
+
+        # Method 3: Use regex to remove surrogate pairs (more precise)
+        # return re.sub(r'[\ud800-\udfff]', '', text)
+
+    def clean_data_for_unicode(self, data):
+        """
+        Recursively clean all string values in a data structure to remove invalid Unicode.
+
+        Args:
+            data: Dictionary, list, or other data structure that may contain strings
+
+        Returns:
+            Cleaned data structure
+        """
+        if isinstance(data, dict):
+            return {key: self.clean_data_for_unicode(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [self.clean_data_for_unicode(item) for item in data]
+        elif isinstance(data, str):
+            return self.clean_unicode_surrogates(data)
+        else:
+            return data
+
     def upload_data(self, data: dict, cursor):
         """
         Insert the extracted property data into the landwatch_properties table.
+        Now with Unicode surrogate handling.
 
         Args:
             data (dict): Dictionary of extracted property fields.
             cursor: A psycopg database cursor for executing the INSERT.
         """
+        # Clean the data to remove invalid Unicode characters
+        data = self.clean_data_for_unicode(data)
+
         if date_str := data.get("listing_date"):
             data["listing_date"] = date.fromisoformat(date_str)
 
@@ -291,7 +345,8 @@ class Landwatch(_Scraper):
                                                        property_types, is_irrigated, is_residence, price, listing_date, \
                                                        title, \
                                                        description, executive_summary, is_diamond, is_gold, is_platinum, \
-                                                       is_showcase, state, cost_per_acre, distance_to_city_miles, cost_per_homesqft) \
+                                                       is_showcase, state, cost_per_acre, distance_to_city_miles, \
+                                                       cost_per_homesqft) \
                      VALUES (%(name)s, %(property_type)s, %(url)s, %(county)s, %(lot_size)s, \
                              %(lot_size_units)s, \
                              %(lot_type)s, %(amenities)s, %(mortgage_options)s, %(activities)s, %(lot_description)s, \
@@ -302,10 +357,22 @@ class Landwatch(_Scraper):
                              %(property_types)s, %(is_irrigated)s, %(is_residence)s, %(price)s, %(listing_date)s, \
                              %(title)s, \
                              %(description)s, %(executive_summary)s, %(is_diamond)s, %(is_gold)s, %(is_platinum)s, \
-                             %(is_showcase)s, %(state)s, %(cost_per_acre)s, %(distance_to_city_miles)s, %(cost_per_homesqft)s ); \
+                             %(is_showcase)s, %(state)s, %(cost_per_acre)s, %(distance_to_city_miles)s, \
+                             %(cost_per_homesqft)s); \
                      """
-        cursor.execute(insert_sql, data)
-        cursor.connection.commit()
+
+        try:
+            cursor.execute(insert_sql, data)
+        except UnicodeEncodeError as e:
+            # If we still get Unicode errors, log the problematic data for debugging
+            print(f"Unicode error persists. Problematic data keys: {list(data.keys())}")
+            for key, value in data.items():
+                if isinstance(value, str):
+                    try:
+                        value.encode('utf-8')
+                    except UnicodeEncodeError:
+                        print(f"Problematic field '{key}': {repr(value)}")
+            raise
 
     def get_unscraped_urls_paginated(self, cur, page_size=25):
         cur.execute("""

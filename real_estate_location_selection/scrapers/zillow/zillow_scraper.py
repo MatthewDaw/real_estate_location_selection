@@ -293,6 +293,7 @@ class Zillow(_Scraper):
                                 print(f"uploaded batch of {len(batch_entries)} (total added: {num_added})")
                                 batches_in_connection += 1
                                 total_batches_processed += 1
+                                conn.commit()
 
                             # If we got fewer URLs than requested, we're done
                             if len(urls) < batch_size:
@@ -366,7 +367,8 @@ class Zillow(_Scraper):
         return [convert(data.get(field)) for field in fields]
 
     def _insert_property_batch(self, cur, entries, urls_to_update, conn):
-        cur.executemany("""
+        print("pause")
+        insert_command = cur.executemany("""
             INSERT INTO zillow_property_details (
                 source_url, status, is_eligible_property, selling_soon, last_sold_price, posting_url,
                 date_posted_string, marketing_name, posting_product_type, lot_area_units, lot_area_value,
