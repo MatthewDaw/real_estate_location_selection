@@ -252,7 +252,7 @@ class Zillow(_Scraper):
         """
         num_added = 0
         num_processed = start_offset
-        batch_size = 10
+        batch_size = 5
         total_batches_processed = 0
 
         try:
