@@ -39,4 +39,4 @@ ENV SCRAPER_PATH=${SCRAPER_PATH}
 ENV DISPLAY=:99
 
 # Run the specified scraper with output redirection
-CMD ["sh", "-c", "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && uv run ${SCRAPER_PATH} 2>&1"]
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && exec uv run ${SCRAPER_PATH}"]
