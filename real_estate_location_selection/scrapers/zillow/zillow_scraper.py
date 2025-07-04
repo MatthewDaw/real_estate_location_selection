@@ -361,7 +361,7 @@ class Zillow(_Scraper):
         ]
         return {k: data.get(k) for k in keys if data.get(k)}
 
-    def process_tasks(self, max_properties=10000, start_offset=0, batch_size=1):
+    def process_tasks(self, max_properties=10000, start_offset=0, batch_size=50):
         """
         Process scraping tasks using BigQuery.
         """

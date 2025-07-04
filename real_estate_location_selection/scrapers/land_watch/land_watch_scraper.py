@@ -546,7 +546,7 @@ class Landwatch(_Scraper):
 
         print(f"Inserted batch of {len(entries)} property details and updated scraped_at")
 
-    def process_tasks(self, max_properties=10000, start_offset=0, batch_size=5):
+    def process_tasks(self, max_properties=None, start_offset=0, batch_size=50):
         """
         Process scraping tasks using BigQuery.
         Fetch all URLs from `landwatch_urls` that have not yet been scraped.
@@ -557,7 +557,7 @@ class Landwatch(_Scraper):
         total_batches_processed = 0
 
         try:
-            while num_added < max_properties:
+            while max_properties is None or num_added < max_properties:
                 # Get URLs to process
                 urls = self._fetch_urls_to_scrape(limit=batch_size)
                 if not urls:
