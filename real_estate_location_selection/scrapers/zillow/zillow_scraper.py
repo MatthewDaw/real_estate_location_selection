@@ -132,7 +132,7 @@ class Zillow(_Scraper):
         hash_object = hashlib.sha256(combined_string.encode('utf-8'))
         return hash_object.hexdigest()
 
-    def prepare_tasks(self, batch_size=100000):
+    def prepare_tasks(self, batch_size=1000):
         """
         Load sitemap URLs and insert property URLs into the `zillow_urls` table.
         Skips the "off-market" sitemap.
@@ -164,6 +164,7 @@ class Zillow(_Scraper):
                     total_batches_processed += 1
                     print(f"Processed batch {total_batches_processed} with {len(batch_entries)} URLs")
                     batch_entries.clear()
+                    return
 
             # Handle remaining entries for this sitemap
             if batch_entries:
