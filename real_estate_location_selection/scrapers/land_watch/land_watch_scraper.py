@@ -1,71 +1,194 @@
 import json
+import re
+from datetime import datetime, date
+from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
 from bs4 import BeautifulSoup
-from real_estate_location_selection.connection import local_db_connection
 from haversine import haversine, Unit
 from real_estate_location_selection.scrapers._scraper import _Scraper
-import re
-from datetime import date
-from psycopg.types.json import Json
 from real_estate_location_selection.scrapers.utils.common_functions import safe_get, safe_lower, safe_divide
+import hashlib
 
 class Landwatch(_Scraper):
     """
-    Scraper class for extracting property listings from LandWatch and storing structured data in a database.
+    Scraper class for extracting property listings from LandWatch and storing structured data in BigQuery.
     """
 
     source = "landwatch"
     use_proxies_camoufox = False
     use_resource_intercept = False
 
-    def prepare_tasks(self, state_source, state_abbreviation, pages_per_batch=25):
+    def __init__(self, browser):
+        super().__init__(browser)
+        self._ensure_tables_exist()
+
+    def _ensure_tables_exist(self):
+        """Create BigQuery tables if they don't exist."""
+
+        # Create landwatch_urls table
+        urls_table_id = f"{self.project_id}.{self.dataset_id}.landwatch_urls"
+        urls_schema = [
+            bigquery.SchemaField("url", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("state", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("scraped_at", "DATE", mode="NULLABLE"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+        ]
+
+        try:
+            self.client.get_table(urls_table_id)
+        except NotFound:
+            table = bigquery.Table(urls_table_id, schema=urls_schema)
+            table = self.client.create_table(table)
+            print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
+
+        # Create landwatch_properties table
+        properties_table_id = f"{self.project_id}.{self.dataset_id}.landwatch_properties"
+        properties_schema = [
+            bigquery.SchemaField("id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("url", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("name", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("property_type", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("date_posted", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("county", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("lot_size", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("lot_size_units", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("lot_type", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("amenities", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("mortgage_options", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("activities", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("lot_description", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("geography", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("road_frontage_desc", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("state", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("city", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("zip", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("address1", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("address2", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("latitude", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("longitude", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("city_latitude", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("city_longitude", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("acres", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("beds", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("baths", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("homesqft", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("property_types", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("is_irrigated", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("is_residence", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("price", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("listing_date", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("title", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("description", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("executive_summary", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("is_diamond", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("is_gold", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("is_platinum", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("is_showcase", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("cost_per_acre", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("distance_to_city_miles", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("cost_per_homesqft", "FLOAT", mode="NULLABLE"),
+        ]
+
+        try:
+            self.client.get_table(properties_table_id)
+        except NotFound:
+            table = bigquery.Table(properties_table_id, schema=properties_schema)
+            table = self.client.create_table(table)
+            print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
+
+    def prepare_tasks(self, state_source, state_abbreviation, pages_per_batch=2):
         """
-        Version with configurable batch size for connection resets.
+        Extract URLs from LandWatch and insert them into BigQuery.
 
         Args:
             state_source (str): The URL path for the state (e.g., "/texas-land-for-sale").
             state_abbreviation (str): The 2-letter abbreviation of the state (e.g., "TX").
-            pages_per_batch (int): Number of pages to process before resetting connection (default: 50).
+            pages_per_batch (int): Number of pages to process before batching (default: 25).
         """
         page = 1
         state_abbr = state_abbreviation.upper()
+        total_batches_processed = 0
 
         while True:
+            batch_entries = []
             batch_start_page = page
 
-            for conn in local_db_connection():
-                with conn.cursor() as cur:
-                    batch_processed = 0
+            # Process pages in batches
+            for _ in range(pages_per_batch):
+                url = f"https://www.landwatch.com{state_source}/page-{page}"
+                self.close_page()
+                self.goto_url(url)
 
-                    while batch_processed < pages_per_batch:
-                        url = f"https://www.landwatch.com{state_source}/page-{page}"
-                        self.close_page()
-                        self.goto_url(url)
+                soup = BeautifulSoup(self.page.content(), "html.parser")
+                links = [a["href"] for a in soup.find_all("a", href=True) if "/pid/" in a["href"]]
 
-                        soup = BeautifulSoup(self.page.content(), "html.parser")
-                        links = [a["href"] for a in soup.find_all("a", href=True) if "/pid/" in a["href"]]
+                if not links:
+                    print(f"No more links found at page {page}. Ending crawl.")
+                    if batch_entries:
+                        self._insert_url_batch(batch_entries)
+                        total_batches_processed += 1
+                        print(f"Final batch: processed {len(batch_entries)} URLs")
+                    print(f"Total batches processed: {total_batches_processed}")
+                    return
 
-                        if not links:
-                            print(f"No more links found at page {page}. Ending crawl.")
-                            print(f"Final batch: processed {batch_processed} pages ({batch_start_page}-{page - 1})")
-                            return
+                # Add URLs to batch
+                for link in links:
+                    batch_entries.append({
+                        'url': f"https://www.landwatch.com{link}",
+                        'state': state_abbr,
+                        'created_at': datetime.utcnow().isoformat()
+                    })
 
-                        url_data = [
-                            (f"https://www.landwatch.com{link}", state_abbr)
-                            for link in links
-                        ]
+                print(f"Page {page}: Found {len(links)} URLs")
+                page += 1
 
-                        cur.executemany(
-                            """
-                            INSERT INTO landwatch_urls (url, state)
-                            VALUES (%s, %s) ON CONFLICT (url) DO NOTHING;
-                            """,
-                            url_data
-                        )
-                        print(f"Page {page}: Updated {len(url_data)} landwatch_urls")
-                        conn.commit()
+            # Insert batch when full
+            if batch_entries:
+                self._insert_url_batch(batch_entries)
+                total_batches_processed += 1
+                print(f"Batch {total_batches_processed}: processed pages {batch_start_page}-{page-1} with {len(batch_entries)} URLs")
 
-                        page += 1
-                        batch_processed += 1
+    def _insert_url_batch(self, entries):
+        """Insert batch of URLs into BigQuery with upsert logic."""
+        table_id = f"{self.project_id}.{self.dataset_id}.landwatch_urls"
+
+        # Check existing URLs to avoid duplicates
+        existing_check_query = f"""
+        SELECT url
+        FROM `{table_id}`
+        WHERE url IN UNNEST(@urls)
+        """
+
+        urls = [entry['url'] for entry in entries]
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("urls", "STRING", urls)
+            ]
+        )
+
+        existing_job = self.client.query(existing_check_query, job_config=job_config)
+        existing_urls = {row.url for row in existing_job.result()}
+
+        # Filter out existing entries
+        new_entries = [
+            entry for entry in entries
+            if entry['url'] not in existing_urls
+        ]
+
+        if new_entries:
+            # Insert new entries using load_table_from_json
+            job_config = bigquery.LoadJobConfig(
+                write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+                source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            )
+
+            job = self.client.load_table_from_json(new_entries, table_id, job_config=job_config)
+            job.result()  # Wait for job to complete
+            print(f"Inserted {len(new_entries)} new URLs (skipped {len(entries) - len(new_entries)} duplicates)")
+        else:
+            print(f"Skipped {len(entries)} URLs (all duplicates)")
 
     def _extract_location_parts_from_url(self, url: str):
         """
@@ -127,11 +250,11 @@ class Landwatch(_Scraper):
             page_source (str): Raw HTML content of the property page.
 
         Returns:
-            tuple: (state_data, city_name, latitude, longitude) or (None, None, None, None) on failure.
+            dict: Dictionary containing property details
         """
         m = re.search(r'window\.serverState\s*=\s*"(.+?)";', page_source, re.DOTALL)
         if not m:
-            return None, None, None, None
+            return {}
 
         raw = m.group(1).encode("utf-8").decode("unicode_escape")
         state = json.loads(raw)
@@ -255,25 +378,23 @@ class Landwatch(_Scraper):
         lot_size_units = lot_size.split(" ")[1] if lot_size and " " in lot_size else None
 
         return {
-        # Core property identification
-        "name": structured_data.get("name"),
-        "property_type": property_type,
-        "url": url,
-        "date_posted": structured_data.get("datePosted"),
-        # Location info
-        "county": county.rstrip('-county'),
-        # Lot characteristics
-        "lot_size": lot_size_value,
-        "lot_size_units": lot_size_units,
-        "lot_type": lot_types,
-        # Property features
-        "amenities": amenities,
-        # Extended/structured metadata
-        **lot_details,
-        **property_info,
-    }
-
-
+            # Core property identification
+            "name": structured_data.get("name"),
+            "property_type": property_type,
+            "url": url,
+            "date_posted": structured_data.get("datePosted"),
+            # Location info
+            "county": county.rstrip('-county') if county else None,
+            # Lot characteristics
+            "lot_size": lot_size_value,
+            "lot_size_units": lot_size_units,
+            "lot_type": lot_types,
+            # Property features
+            "amenities": amenities,
+            # Extended/structured metadata
+            **lot_details,
+            **property_info,
+        }
 
     def clean_unicode_surrogates(self, text):
         """
@@ -288,21 +409,16 @@ class Landwatch(_Scraper):
         if not isinstance(text, str):
             return text
 
-        # Method 1: Remove surrogates entirely
-        # return text.encode('utf-8', 'ignore').decode('utf-8')
-
-        # Method 2: Replace surrogates with replacement character
+        # Replace surrogates with replacement character
         return text.encode('utf-8', 'replace').decode('utf-8')
-
-        # Method 3: Use regex to remove surrogate pairs (more precise)
-        # return re.sub(r'[\ud800-\udfff]', '', text)
 
     def clean_data_for_unicode(self, data):
         """
-        Recursively clean all string values in a data structure to remove invalid Unicode.
+        Recursively clean all string values in a data structure to remove invalid Unicode
+        and convert datetime/date objects to ISO formatted strings.
 
         Args:
-            data: Dictionary, list, or other data structure that may contain strings
+            data: Dictionary, list, or other data structure that may contain strings or dates
 
         Returns:
             Cleaned data structure
@@ -313,100 +429,180 @@ class Landwatch(_Scraper):
             return [self.clean_data_for_unicode(item) for item in data]
         elif isinstance(data, str):
             return self.clean_unicode_surrogates(data)
+        elif isinstance(data, (datetime, date)):
+            return data.isoformat()
         else:
             return data
 
-    def upload_data(self, data: dict, cursor):
+    def _generate_property_id(self, name, city, zip_code, address1, address2):
         """
-        Insert the extracted property data into the landwatch_properties table.
-        Now with Unicode surrogate handling.
+        Generate a unique ID hash based on building name, city, zip, address1, and address2.
 
         Args:
-            data (dict): Dictionary of extracted property fields.
-            cursor: A psycopg database cursor for executing the INSERT.
+            name (str): Property/building name
+            city (str): City name
+            zip_code (str): ZIP code
+            address1 (str): Primary address
+            address2 (str): Secondary address
+
+        Returns:
+            str: SHA256 hash of the combined address components
+        """
+        # Convert all inputs to strings and handle None values
+        components = [
+            str(name or ''),
+            str(city or ''),
+            str(zip_code or ''),
+            str(address1 or ''),
+            str(address2 or '')
+        ]
+
+        # Normalize by converting to lowercase and stripping whitespace
+        normalized_components = [comp.lower().strip() for comp in components]
+
+        # Join components with a separator
+        combined_string = '|'.join(normalized_components)
+
+        # Generate SHA256 hash
+        hash_object = hashlib.sha256(combined_string.encode('utf-8'))
+        return hash_object.hexdigest()
+
+    def _prepare_data_for_db(self, data):
+        """
+        Prepares property details for BigQuery insertion.
         """
         # Clean the data to remove invalid Unicode characters
         data = self.clean_data_for_unicode(data)
 
-        if date_str := data.get("listing_date"):
-            data["listing_date"] = date.fromisoformat(date_str)
+        # Generate unique ID based on address components
+        property_id = self._generate_property_id(
+            data.get('name'),
+            data.get('city'),
+            data.get('zip'),
+            data.get('address1'),
+            data.get('address2')
+        )
+        data['id'] = property_id
 
-        if isinstance(data.get("state"), dict):
-            data["state"] = Json(data["state"])  # convert dict to JSON for JSONB column
+        # Ensure all fields match the schema
+        schema_fields = [
+            'id', 'name', 'property_type', 'date_posted', 'county', 'lot_size', 'lot_size_units',
+            'lot_type', 'amenities', 'mortgage_options', 'activities', 'lot_description',
+            'geography', 'road_frontage_desc', 'state', 'city', 'zip', 'address1',
+            'address2', 'latitude', 'longitude', 'city_latitude', 'city_longitude',
+            'acres', 'beds', 'baths', 'homesqft', 'property_types', 'is_irrigated',
+            'is_residence', 'price', 'listing_date', 'title', 'description',
+            'executive_summary', 'is_diamond', 'is_gold', 'is_platinum', 'is_showcase',
+            'cost_per_acre', 'distance_to_city_miles', 'cost_per_homesqft'
+        ]
 
-        insert_sql = """
-                     INSERT INTO landwatch_properties (name, property_type, url, county, lot_size, \
-                                                       lot_size_units, \
-                                                       lot_type, amenities, mortgage_options, activities, \
-                                                       lot_description, geography, \
-                                                       road_frontage_desc, city, zip, address1, address2, latitude, \
-                                                       longitude, \
-                                                       city_latitude, city_longitude, acres, beds, baths, homesqft, \
-                                                       property_types, is_irrigated, is_residence, price, listing_date, \
-                                                       title, \
-                                                       description, executive_summary, is_diamond, is_gold, is_platinum, \
-                                                       is_showcase, state, cost_per_acre, distance_to_city_miles, \
-                                                       cost_per_homesqft) \
-                     VALUES (%(name)s, %(property_type)s, %(url)s, %(county)s, %(lot_size)s, \
-                             %(lot_size_units)s, \
-                             %(lot_type)s, %(amenities)s, %(mortgage_options)s, %(activities)s, %(lot_description)s, \
-                             %(geography)s, \
-                             %(road_frontage_desc)s, %(city)s, %(zip)s, %(address1)s, %(address2)s, %(latitude)s, \
-                             %(longitude)s, \
-                             %(city_latitude)s, %(city_longitude)s, %(acres)s, %(beds)s, %(baths)s, %(homesqft)s, \
-                             %(property_types)s, %(is_irrigated)s, %(is_residence)s, %(price)s, %(listing_date)s, \
-                             %(title)s, \
-                             %(description)s, %(executive_summary)s, %(is_diamond)s, %(is_gold)s, %(is_platinum)s, \
-                             %(is_showcase)s, %(state)s, %(cost_per_acre)s, %(distance_to_city_miles)s, \
-                             %(cost_per_homesqft)s); \
-                     """
+        return {field: data.get(field) for field in schema_fields}
+
+    def _fetch_urls_to_scrape(self, limit=1000):
+        """
+        Fetch URLs to scrape with proper limit and offset support.
+        Only returns URLs where ALL associated records have scraped_at IS NULL.
+        """
+        query = f"""
+        SELECT url, ANY_VALUE(state) as state
+        FROM `{self.project_id}.{self.dataset_id}.landwatch_urls`
+        GROUP BY url
+        HAVING COUNTIF(scraped_at IS NOT NULL) = 0
+        ORDER BY url
+        LIMIT {limit}
+        """
+        query_job = self.client.query(query)
+        return list(query_job.result())
+
+    def _insert_property_batch(self, entries, urls_to_update):
+        """Insert property batch into BigQuery."""
+        table_id = f"{self.project_id}.{self.dataset_id}.landwatch_properties"
+
+        # Insert property details
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        )
+
+        job = self.client.load_table_from_json(entries, table_id, job_config=job_config)
+        job.result()  # Wait for job to complete
+
+        # Update scraped_at for processed URLs
+        if urls_to_update:
+            update_query = f"""
+            UPDATE `{self.project_id}.{self.dataset_id}.landwatch_urls`
+            SET scraped_at = CURRENT_DATE()
+            WHERE url IN UNNEST(@urls)
+            """
+
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ArrayQueryParameter("urls", "STRING", urls_to_update)
+                ]
+            )
+
+            query_job = self.client.query(update_query, job_config=job_config)
+            query_job.result()
+
+        print(f"Inserted batch of {len(entries)} property details and updated scraped_at")
+
+    def process_tasks(self, max_properties=10000, start_offset=0, batch_size=5):
+        """
+        Process scraping tasks using BigQuery.
+        Fetch all URLs from `landwatch_urls` that have not yet been scraped.
+        For each, extract data, upload it to BigQuery, and mark the URL as scraped.
+        """
+        num_added = 0
+        num_processed = start_offset
+        total_batches_processed = 0
 
         try:
-            cursor.execute(insert_sql, data)
-        except UnicodeEncodeError as e:
-            # If we still get Unicode errors, log the problematic data for debugging
-            print(f"Unicode error persists. Problematic data keys: {list(data.keys())}")
-            for key, value in data.items():
-                if isinstance(value, str):
+            while num_added < max_properties:
+                # Get URLs to process
+                urls = self._fetch_urls_to_scrape(limit=batch_size)
+                if not urls:
+                    print("No more URLs to scrape")
+                    return
+
+                batch_entries = []
+                urls_to_update = []
+
+                for url_row in urls:
+                    url = url_row.url
+                    state = url_row.state
+                    num_processed += 1
+
+                    print(f"extracting landwatch url {url} (processed: {num_processed}, added: {num_added})")
                     try:
-                        value.encode('utf-8')
-                    except UnicodeEncodeError:
-                        print(f"Problematic field '{key}': {repr(value)}")
-            raise
-
-    def get_unscraped_urls_paginated(self, cur, page_size=25):
-        cur.execute("""
-                    SELECT url, state
-                    FROM landwatch_urls
-                    WHERE scraped_at IS NULL
-                    ORDER BY url -- Important: always use ORDER BY with pagination
-                        LIMIT %s
-                    """, (page_size,))
-        return cur.fetchall()
-
-    def process_tasks(self):
-        """
-        Fetch all URLs from `landwatch_urls` that have not yet been scraped.
-        For each, extract data, upload it to the database, and mark the URL as scraped.
-        """
-        is_complete = False
-        while not is_complete:
-            today = date.today()
-            for conn in local_db_connection():
-                with conn.cursor() as cur:
-                    results = self.get_unscraped_urls_paginated(cur)
-                    if not results:
-                        is_complete = True
-                        break
-                    for url, state in results:
-                        self.close_page()
-                        print(f"extracting details for {url}")
                         data = self.extract_from_website(url, state)
-                        print(f"uploading data for {url}")
-                        self.upload_data(data, cur)
-                        cur.execute(
-                            "UPDATE landwatch_urls SET scraped_at = %s WHERE url = %s;",
-                            (today, url),
-                        )
-                        conn.commit()
-                        print(f"Updated scraped_at for: {url}")
+                        if data:
+                            safe_data = self._prepare_data_for_db(data)
+                            batch_entry = {
+                                'url': url,
+                                'created_at': datetime.utcnow().isoformat(),
+                                **safe_data
+                            }
+                            batch_entries.append(batch_entry)
+                            urls_to_update.append(url)
+                    except Exception as e:
+                        print(f"Error processing URL {url}: {e}")
+                        continue
+
+                # Insert the batch
+                if batch_entries:
+                    num_added += len(batch_entries)
+                    self._insert_property_batch(batch_entries, urls_to_update)
+                    print(f"uploaded batch of {len(batch_entries)} (total added: {num_added})")
+                    total_batches_processed += 1
+
+                # If we got fewer URLs than requested, we're done
+                if len(urls) < batch_size:
+                    print("Reached end of available URLs")
+                    return
+
+        except Exception as e:
+            print(f"Error during processing: {e}")
+            print(f"Resume with: process_tasks(start_offset={num_processed})")
+            raise e
+
+        print(f"Complete: {num_added} added, {num_processed} processed, {total_batches_processed} batches")

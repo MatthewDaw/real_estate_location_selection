@@ -1,31 +1,138 @@
 import json
 import re
+import hashlib
+from datetime import datetime
+from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
 from real_estate_location_selection.scrapers._scraper import _Scraper
-from real_estate_location_selection.connection import local_db_connection
+
 
 class Zillow(_Scraper):
     source = "zillow"
     use_proxies_camoufox = True
     use_resource_intercept = False
 
-    def _process_connection_batch(self, connection_batch, batch_offset):
+    def __init__(self, browser):
+        super().__init__(browser)
+        self._ensure_tables_exist()
+
+    def _ensure_tables_exist(self):
+        """Create BigQuery tables if they don't exist."""
+
+        # Create zillow_urls table
+        urls_table_id = f"{self.project_id}.{self.dataset_id}.zillow_urls"
+        urls_schema = [
+            bigquery.SchemaField("url", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("type", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("scraped_at", "DATE", mode="NULLABLE"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+        ]
+
+        try:
+            self.client.get_table(urls_table_id)
+        except NotFound:
+            table = bigquery.Table(urls_table_id, schema=urls_schema)
+            table = self.client.create_table(table)
+            print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
+
+        # Create zillow_property_details table
+        details_table_id = f"{self.project_id}.{self.dataset_id}.zillow_property_details"
+        details_schema = [
+            bigquery.SchemaField("id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("source_url", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("status", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("is_eligible_property", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("selling_soon", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("last_sold_price", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("posting_url", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("date_posted_string", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("marketing_name", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("posting_product_type", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("lot_area_units", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("lot_area_value", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("lot_size", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("living_area_units", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("living_area", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("street_address", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("city", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("state", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("zipcode", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("price", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("currency", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("home_type", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("is_preforeclosure_auction", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("address", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("bedrooms", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("bathrooms", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("year_built", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("living_area_units_short", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("country", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("monthly_hoa_fee", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("zestimate", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("new_construction_type", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("zestimate_low_percent", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("zestimate_high_percent", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("time_on_zillow", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("page_view_count", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("favorite_count", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("days_on_zillow", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("latitude", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("longitude", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("is_income_restricted", "BOOLEAN", mode="NULLABLE"),
+            bigquery.SchemaField("price_history", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("most_recent_price", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("most_recent_price_date", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("most_recent_price_change_rate", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("rental_application_accepted_type", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("home_insights", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("school_distances", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("num_schools_close_to", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("avg_school_distance", "FLOAT", mode="NULLABLE"),
+            bigquery.SchemaField("risks", "JSON", mode="NULLABLE"),
+            bigquery.SchemaField("description", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("foreclosure", "JSON", mode="NULLABLE"),
+        ]
+
+        try:
+            self.client.get_table(details_table_id)
+        except NotFound:
+            table = bigquery.Table(details_table_id, schema=details_schema)
+            table = self.client.create_table(table)
+            print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
+
+    def _generate_property_id(self, marketing_name, street_address, city, zipcode):
         """
-        Helper method to process a batch of batches within a single connection.
+        Generate a unique ID hash based on marketing name, street address, city, and zipcode.
 
         Args:
-            connection_batch (list): List of batch_entries to process
-            batch_offset (int): Starting batch number for logging
+            marketing_name (str): Property/marketing name
+            street_address (str): Street address
+            city (str): City name
+            zipcode (str): ZIP code
+
+        Returns:
+            str: SHA256 hash of the combined address components
         """
-        for conn in local_db_connection():
-            with conn.cursor() as cur:
-                for i, batch_entries in enumerate(connection_batch):
-                    self._insert_url_batch(cur, batch_entries, conn)
-                    batch_num = batch_offset + i + 1
-                    print(f"Updated {len(batch_entries)} zillow url entries (batch {batch_num})")
+        # Convert all inputs to strings and handle None values
+        components = [
+            str(marketing_name or ''),
+            str(street_address or ''),
+            str(city or ''),
+            str(zipcode or '')
+        ]
 
-            print(f"Connection reset after processing {len(connection_batch)} batches")
+        # Normalize by converting to lowercase and stripping whitespace
+        normalized_components = [comp.lower().strip() for comp in components]
 
-    def prepare_tasks(self, batches_per_connection=50):
+        # Join components with a separator
+        combined_string = '|'.join(normalized_components)
+
+        # Generate SHA256 hash
+        hash_object = hashlib.sha256(combined_string.encode('utf-8'))
+        return hash_object.hexdigest()
+
+    def prepare_tasks(self, batch_size=100000):
         """
         Load sitemap URLs and insert property URLs into the `zillow_urls` table.
         Skips the "off-market" sitemap.
@@ -35,7 +142,6 @@ class Zillow(_Scraper):
             "https://www.zillow.com/xml/indexes/us/hdp/for-sale-by-owner.xml.gz",
         ]
 
-        batch_size = 100000
         total_batches_processed = 0
 
         for sitemap_url in sitemap_urls:
@@ -44,47 +150,56 @@ class Zillow(_Scraper):
 
             listing_urls_generator = self._extract_listing_urls(sitemap_url)
             batch_entries = []
-            batches_in_current_connection = 0
-            current_connection_batch = []
 
             for listing_url in listing_urls_generator:
-                batch_entries.append((listing_url, listing_type))
+                batch_entries.append({
+                    'url': listing_url,
+                    'type': listing_type,
+                    'created_at': datetime.utcnow().isoformat()
+                })
 
-                # When batch is full, add to connection batch
+                # When batch is full, process it
                 if len(batch_entries) >= batch_size:
-                    current_connection_batch.append(batch_entries.copy())
+                    self._insert_url_batch(batch_entries)
+                    total_batches_processed += 1
+                    print(f"Processed batch {total_batches_processed} with {len(batch_entries)} URLs")
                     batch_entries.clear()
-                    batches_in_current_connection += 1
 
-                    # Process batches when connection limit reached
-                    if batches_in_current_connection >= batches_per_connection:
-                        self._process_connection_batch(current_connection_batch, total_batches_processed)
-                        total_batches_processed += len(current_connection_batch)
-                        current_connection_batch.clear()
-                        batches_in_current_connection = 0
-
-            # Handle remaining batches for this sitemap
+            # Handle remaining entries for this sitemap
             if batch_entries:
-                current_connection_batch.append(batch_entries.copy())
-                batch_entries.clear()
-
-            if current_connection_batch:
-                self._process_connection_batch(current_connection_batch, total_batches_processed)
-                total_batches_processed += len(current_connection_batch)
-                current_connection_batch.clear()
+                self._insert_url_batch(batch_entries)
+                total_batches_processed += 1
+                print(f"Processed final batch {total_batches_processed} with {len(batch_entries)} URLs")
 
             print(f"Completed sitemap: {listing_type}")
 
         print(f"Total batches processed: {total_batches_processed}")
 
-    def _insert_url_batch(self, cur, entries, conn):
-        cur.executemany("""
-            INSERT INTO zillow_urls (url, type)
-            VALUES (%s, %s)
-            ON CONFLICT (url, type) DO NOTHING
-        """, entries)
-        conn.commit()
-        print(f"Upserted batch of {len(entries)} URLs")
+    def _insert_url_batch(self, entries):
+        """Insert batch of URLs into BigQuery with upsert logic."""
+        table_id = f"{self.project_id}.{self.dataset_id}.zillow_urls"
+
+        # Convert entries to the format expected by BigQuery
+        formatted_entries = []
+        for entry in entries:
+            formatted_entries.append({
+                'url': entry['url'],
+                'type': entry['type'],
+                'created_at': entry['created_at']
+            })
+
+        if formatted_entries:
+            # Insert new entries using load_table_from_json
+            job_config = bigquery.LoadJobConfig(
+                write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+                source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            )
+
+            job = self.client.load_table_from_json(formatted_entries, table_id, job_config=job_config)
+            job.result()  # Wait for job to complete
+            print(f"Inserted {len(formatted_entries)} new URLs (skipped {len(entries) - len(formatted_entries)} duplicates)")
+        else:
+            print(f"Skipped {len(entries)} URLs (all duplicates)")
 
     def _extract_listing_urls(self, sitemap_url):
         """
@@ -245,109 +360,102 @@ class Zillow(_Scraper):
         ]
         return {k: data.get(k) for k in keys if data.get(k)}
 
-    # Version with progress persistence for resumability
-    def process_tasks(self, batches_per_connection=1, max_properties=10000, start_offset=0):
+    def process_tasks(self, max_properties=10000, start_offset=0, batch_size=1):
         """
-        Cleaner version with proper generator handling.
+        Process scraping tasks using BigQuery.
         """
         num_added = 0
         num_processed = start_offset
-        batch_size = 5
         total_batches_processed = 0
 
         try:
             while num_added < max_properties:
-                batches_in_connection = 0
+                # Get URLs to process
+                urls = self._fetch_urls_to_scrape(limit=batch_size, offset=num_processed)
+                if not urls:
+                    print("No more URLs to scrape")
+                    return
 
-                for conn in local_db_connection():
-                    with conn.cursor() as cur:
-                        while (batches_in_connection < batches_per_connection and
-                               num_added < max_properties):
+                batch_entries = []
+                urls_to_update = []
 
-                            # Get URLs to process
-                            urls = self._fetch_urls_to_scrape(cur, limit=batch_size, offset=num_processed)
-                            if not urls:
-                                print("No more URLs to scrape")
-                                return
+                for url_row in urls:
+                    url = url_row.url
+                    num_processed += 1
 
-                            batch_entries, urls_to_update = [], []
+                    print(f"extracting zillow url {url} (processed: {num_processed}, added: {num_added})")
+                    try:
+                        data = self.extract_from_website(url)
+                        if data:
+                            safe_data = self._prepare_data_for_db(data)
+                            batch_entry = {
+                                'source_url': url,
+                                'created_at': datetime.utcnow().isoformat(),
+                                **safe_data
+                            }
+                            batch_entries.append(batch_entry)
+                            urls_to_update.append(url)
+                    except Exception as e:
+                        print(f"Error processing URL {url}: {e}")
+                        continue
 
-                            for (url,) in urls:
-                                num_processed += 1
+                # Insert the batch
+                if batch_entries:
+                    num_added += len(batch_entries)
+                    self._insert_property_batch(batch_entries, urls_to_update)
+                    print(f"uploaded batch of {len(batch_entries)} (total added: {num_added})")
+                    total_batches_processed += 1
 
-                                print(f"extracting zillow url {url} (processed: {num_processed}, added: {num_added})")
-                                try:
-                                    data = self.extract_from_website(url)
-                                    if data:
-                                        safe_data = self._prepare_data_for_db(data)
-                                        batch_entries.append((url, *safe_data))
-                                        urls_to_update.append(url)
-                                except Exception as e:
-                                    print(f"Error processing URL {url}: {e}")
-                                    continue
-
-                            # Insert the batch
-                            if batch_entries:
-                                num_added += len(batch_entries)
-                                self._insert_property_batch(cur, batch_entries, urls_to_update, conn)
-                                print(f"uploaded batch of {len(batch_entries)} (total added: {num_added})")
-                                batches_in_connection += 1
-                                total_batches_processed += 1
-                                conn.commit()
-
-                            # If we got fewer URLs than requested, we're done
-                            if len(urls) < batch_size:
-                                print("Reached end of available URLs")
-                                return
-
-                print(f"Connection reset after {batches_in_connection} batches")
+                # If we got fewer URLs than requested, we're done
+                if len(urls) < batch_size:
+                    print("Reached end of available URLs")
+                    return
 
         except Exception as e:
             print(f"Error during processing: {e}")
-            print(f"Resume with: process_tasks_clean(start_offset={num_processed})")
+            print(f"Resume with: process_tasks(start_offset={num_processed})")
             raise e
 
         print(f"Complete: {num_added} added, {num_processed} processed, {total_batches_processed} batches")
 
-    # Updated helper method to support limit properly
-    def _fetch_urls_to_scrape(self, cur, limit=1000, offset=0):
+    def _fetch_urls_to_scrape(self, limit=1000, offset=0):
         """
         Fetch URLs to scrape with proper limit and offset support.
-
-        Args:
-            cur: Database cursor
-            limit (int): Maximum number of URLs to fetch
-            offset (int): Number of URLs to skip
+        Only returns URLs where ALL associated records have scraped_at IS NULL.
         """
-        query = """
-                SELECT url
-                FROM zillow_urls
-                WHERE scraped_at IS NULL
-                ORDER BY id
-                    LIMIT %s \
-                OFFSET %s \
-                """
-        cur.execute(query, (limit, offset))
-        return cur.fetchall()
+        query = f"""
+        SELECT url
+        FROM `{self.project_id}.{self.dataset_id}.zillow_urls`
+        GROUP BY url
+        HAVING COUNTIF(scraped_at IS NOT NULL) = 0
+        ORDER BY url
+        LIMIT {limit}
+        OFFSET {offset}
+        """
+
+        query_job = self.client.query(query)
+        return list(query_job.result())
 
     def _prepare_data_for_db(self, data):
         """
-        Prepares property details for DB insertion:
-        - Converts dicts/lists to JSON if needed
-        - Leaves simple lists of numbers as they are
+        Prepares property details for BigQuery insertion.
         """
+        # Generate unique ID based on address components
+        property_id = self._generate_property_id(
+            data.get('marketing_name'),
+            data.get('street_address'),
+            data.get('city'),
+            data.get('zipcode')
+        )
 
         def convert(value):
             if isinstance(value, dict):
-                return json.dumps(value)
+                return value  # BigQuery handles JSON natively
             elif isinstance(value, list):
                 if all(isinstance(item, (int, float, str, type(None))) for item in value):
-                    # Convert list of numbers to floats if consistent
-                    return [float(item) for item in value] if all(
-                        isinstance(item, (int, float)) for item in value) else value
+                    return [float(item) if isinstance(item, (int, float)) else item for item in value]
                 else:
-                    # Convert complex/nested lists to JSON
-                    return json.dumps(value)
+                    return value  # BigQuery handles JSON arrays
             return value
 
         fields = [
@@ -364,34 +472,41 @@ class Zillow(_Scraper):
             'num_schools_close_to', 'avg_school_distance', 'risks', 'description', 'foreclosure'
         ]
 
-        return [convert(data.get(field)) for field in fields]
+        prepared_data = {field: convert(data.get(field)) for field in fields}
+        prepared_data['id'] = property_id
 
-    def _insert_property_batch(self, cur, entries, urls_to_update, conn):
-        print("pause")
-        insert_command = cur.executemany("""
-            INSERT INTO zillow_property_details (
-                source_url, status, is_eligible_property, selling_soon, last_sold_price, posting_url,
-                date_posted_string, marketing_name, posting_product_type, lot_area_units, lot_area_value,
-                lot_size, living_area_units, living_area, street_address, city, state, zipcode, price,
-                currency, home_type, is_preforeclosure_auction, address, bedrooms, bathrooms, year_built,
-                living_area_units_short, country, monthly_hoa_fee, zestimate, new_construction_type,
-                zestimate_low_percent, zestimate_high_percent, time_on_zillow, page_view_count,
-                favorite_count, days_on_zillow, latitude, longitude, is_income_restricted, price_history,
-                most_recent_price, most_recent_price_date, most_recent_price_change_rate,
-                rental_application_accepted_type, home_insights, school_distances, num_schools_close_to,
-                avg_school_distance, risks, description, foreclosure
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                      %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                      %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, entries)
+        return prepared_data
 
-        cur.execute("""
-            UPDATE zillow_urls
-            SET scraped_at = CURRENT_DATE
-            WHERE url = ANY(%s)
-        """, (urls_to_update,))
+    def _insert_property_batch(self, entries, urls_to_update):
+        """Insert property batch into BigQuery."""
+        table_id = f"{self.project_id}.{self.dataset_id}.zillow_property_details"
 
-        conn.commit()
+        # Insert property details
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+        )
+
+        job = self.client.load_table_from_json(entries, table_id, job_config=job_config)
+        job.result()  # Wait for job to complete
+
+        # Update scraped_at for processed URLs
+        if urls_to_update:
+            update_query = f"""
+            UPDATE `{self.project_id}.{self.dataset_id}.zillow_urls`
+            SET scraped_at = CURRENT_DATE()
+            WHERE url IN UNNEST(@urls)
+            """
+
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ArrayQueryParameter("urls", "STRING", urls_to_update)
+                ]
+            )
+
+            query_job = self.client.query(update_query, job_config=job_config)
+            query_job.result()
+
         print(f"Inserted batch of {len(entries)} property details and updated scraped_at")
 
     def set_property_website(self, gdp):

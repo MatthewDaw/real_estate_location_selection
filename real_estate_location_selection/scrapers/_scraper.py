@@ -5,6 +5,7 @@ import json
 import logging
 import time
 import uuid
+import random
 from datetime import datetime, timezone
 from multiprocessing.pool import ThreadPool
 from typing import TypedDict
@@ -27,6 +28,7 @@ class _Scraper:
     interface for each scraper.
     """
 
+    # real_estate
     source: str | None = None  # Override
     _page: Page | None = None
     _browser: Browser | None = None
@@ -46,6 +48,13 @@ class _Scraper:
         self.now = datetime.now(timezone.utc).date().isoformat()
         self._browser = browser
         self.default_timeout = default_timeout
+
+        project_id = 'flowing-flame-464314-j5'
+        dataset_id = 'real_estate'
+        self.project_id = project_id
+        self.dataset_id = dataset_id
+        self.client = bigquery.Client(project=project_id)
+        self.dataset_ref = self.client.get_dataset(dataset_id)
 
     @property
     def page(self):
@@ -377,7 +386,7 @@ class _Scraper:
         except Exception as e:
             logging.info(e)
             self.close_page()
-            time.sleep(5)
+            time.sleep(random.randint(2, 12))
             raise e
 
     def goto_url(self, url: str):
