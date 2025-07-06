@@ -153,7 +153,7 @@ class DistributedJobLoader:
         # You could add a function to check Pub/Sub queue size here
 
         # Try to acquire lock
-        if not self.acquire_lock(lock_name, lock_duration_minutes=6):
+        if not self.acquire_lock(lock_name, lock_duration_minutes=3):
             print(f"Another process is already loading {self.scraper} jobs")
             return False
 

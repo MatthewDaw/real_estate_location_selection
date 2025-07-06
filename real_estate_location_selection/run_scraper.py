@@ -97,4 +97,4 @@ def run_scraper(scraper_source, max_empty_queue_attempts=5):
 
 
 if __name__ == '__main__':
-    run_scraper("zillow", 5)
+    run_scraper("zillow", 10)
