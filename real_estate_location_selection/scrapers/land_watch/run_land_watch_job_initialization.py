@@ -57,6 +57,8 @@ urls = [
 ]
 
 state_abbreviations = [
+    "ID",  # Idaho
+    "UT",  # Utah
     "AL",  # Alabama
     "AK",  # Alaska
     "AZ",  # Arizona
@@ -68,7 +70,6 @@ state_abbreviations = [
     "FL",  # Florida
     "GA",  # Georgia
     "HI",  # Hawaii
-    "ID",  # Idaho
     "IL",  # Illinois
     "IN",  # Indiana
     "IA",  # Iowa
@@ -100,7 +101,6 @@ state_abbreviations = [
     "SD",  # South Dakota
     "TN",  # Tennessee
     "TX",  # Texas
-    "UT",  # Utah
     "VT",  # Vermont
     "VA",  # Virginia
     "WA",  # Washington
