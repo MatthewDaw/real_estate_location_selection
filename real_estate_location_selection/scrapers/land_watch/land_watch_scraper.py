@@ -18,6 +18,29 @@ class Landwatch(_Scraper):
     source = "landwatch"
     use_proxies_camoufox = False
     use_resource_intercept = False
+    states_to_scrape = [
+        'UT',
+        'ID',
+        'NV',
+        'WY',
+        'MT',
+        'NH',
+        'CO',
+        'AZ',
+        'NM',
+        'TX',
+        'OK',
+        'KS',
+        'NE',
+        'IA',
+        'IL',
+        'MO',
+        'IN',
+        'AR',
+        'LA',
+        'MS',
+        'MI',
+    ]
 
     def __init__(self, browser):
         super().__init__(browser, "landwatch-job-queue")
@@ -508,6 +531,7 @@ class Landwatch(_Scraper):
         query = f"""
         SELECT url, ANY_VALUE(state) as state
         FROM `{self.project_id}.{self.dataset_id}.landwatch_urls`
+        WHERE state in ('{"','".join(self.states_to_scrape)}')
         GROUP BY url
         HAVING COUNTIF(scraped_at IS NOT NULL) = 0
         ORDER BY url

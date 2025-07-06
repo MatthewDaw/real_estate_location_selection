@@ -27,6 +27,7 @@ class Zillow(_Scraper):
         urls_table_id = f"{self.project_id}.{self.dataset_id}.zillow_urls"
         urls_schema = [
             bigquery.SchemaField("url", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("state", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("type", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("scraped_at", "DATE", mode="NULLABLE"),
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
@@ -136,6 +137,25 @@ class Zillow(_Scraper):
         hash_object = hashlib.sha256(combined_string.encode('utf-8'))
         return hash_object.hexdigest()
 
+    def _extract_state_from_url(self, url):
+        state_abbreviations = [
+            "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+            "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+            "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+            "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+            "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+        ]
+
+        # Split the URL by '/' and '-' to get individual parts
+        parts = url.replace('/', '-').split('-')
+
+        # Look for 2-letter uppercase strings that match state abbreviations
+        for part in parts:
+            if len(part) == 2 and part.upper() in state_abbreviations:
+                return part.upper()
+
+        return None
+
     def prepare_tasks(self, batch_size=1000):
         """
         Load sitemap URLs and insert property URLs into the `zillow_urls` table.
@@ -156,18 +176,23 @@ class Zillow(_Scraper):
             batch_entries = []
 
             for listing_url in listing_urls_generator:
-                batch_entries.append({
-                    'url': listing_url,
-                    'type': listing_type,
-                    'created_at': datetime.utcnow().isoformat()
-                })
+                state_abbreviation = self._extract_state_from_url(listing_url)
+                # if state abbreviation is none, then this a canadian property and we don't care to
+                # process it
+                if state_abbreviation is not None:
+                    batch_entries.append({
+                        'state': state_abbreviation,
+                        'url': listing_url,
+                        'type': listing_type,
+                        'created_at': datetime.utcnow().isoformat()
+                    })
 
-                # When batch is full, process it
-                if len(batch_entries) >= batch_size:
-                    self._insert_url_batch(batch_entries)
-                    self.total_batches_processed += 1
-                    print(f"Processed batch {self.total_batches_processed} with {len(batch_entries)} URLs")
-                    batch_entries.clear()
+                    # When batch is full, process it
+                    if len(batch_entries) >= batch_size:
+                        self._insert_url_batch(batch_entries)
+                        self.total_batches_processed += 1
+                        print(f"Processed batch {self.total_batches_processed} with {len(batch_entries)} URLs")
+                        batch_entries.clear()
 
             # Handle remaining entries for this sitemap
             if batch_entries:
@@ -212,6 +237,7 @@ class Zillow(_Scraper):
             formatted_entries = []
             for entry in new_entries:
                 formatted_entries.append({
+                    'state': entry['state'],
                     'url': entry['url'],
                     'type': entry['type'],
                     'created_at': entry['created_at']
@@ -442,7 +468,7 @@ class Zillow(_Scraper):
 
         print(f"Complete: {self.num_added} added, {self.num_processed} processed, {self.total_batches_processed} batches")
 
-    def _fetch_urls_to_scrape(self, limit=1000, offset=0):
+    def _fetch_urls_to_scrape(self, limit=1000):
         """
         Fetch URLs to scrape with proper limit and offset support.
         Only returns URLs where ALL associated records have scraped_at IS NULL.
@@ -454,7 +480,6 @@ class Zillow(_Scraper):
         HAVING COUNTIF(scraped_at IS NOT NULL) = 0
         ORDER BY url
         LIMIT {limit}
-        OFFSET {offset}
         """
 
         query_job = self.client.query(query)

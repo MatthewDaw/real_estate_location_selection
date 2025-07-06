@@ -7,6 +7,7 @@ def run_scraper():
     print("zillow scraper started")
     browser = get_browser()
     scraper = Zillow(browser)
+    # scraper._fetch_urls_to_scrape()
     print("preparing zillow scraper tasks")
     scraper.prepare_tasks()
     print("processing zillow scraper tasks")
