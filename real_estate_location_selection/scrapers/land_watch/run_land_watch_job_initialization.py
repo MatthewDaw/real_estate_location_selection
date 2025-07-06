@@ -117,9 +117,8 @@ def run_scraper():
     print("scraper started")
     browser = get_browser()
     scraper = Landwatch(browser)
-    scraper._fetch_urls_to_scrape()
     print("preparing tasks")
-    # prepare_tasks(scraper)
+    prepare_tasks(scraper)
 
 if __name__ == '__main__':
     run_scraper()
