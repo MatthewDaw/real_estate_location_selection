@@ -16,7 +16,7 @@ request = batch_v1.CreateJobRequest(
                 parallelism=1,
                 task_spec=batch_v1.TaskSpec(
                     compute_resource=batch_v1.ComputeResource(
-                        cpu_milli=2000,
+                        cpu_milli=1000,
                         memory_mib=2048
                     ),
                     max_retry_count=10,
@@ -46,7 +46,7 @@ request = batch_v1.CreateJobRequest(
                 batch_v1.AllocationPolicy.InstancePolicyOrTemplate(
                     policy=batch_v1.AllocationPolicy.InstancePolicy(
                         machine_type="e2-small",
-                        provisioning_model="STANDARD"
+                        provisioning_model="SPOT"
                     )
                 )
             ]
