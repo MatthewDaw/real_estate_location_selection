@@ -20,7 +20,7 @@ request = batch_v1.CreateJobRequest(
                         memory_mib=2048
                     ),
                     max_retry_count=10,  # Maximum allowed retry count
-                    max_run_duration="72000s",  # 20 hours timeout (20 * 60 * 60 = 72000 seconds)
+                    max_run_duration="86400s",  # 20 hours timeout (20 * 60 * 60 = 72000 seconds)
                     runnables=[
                         batch_v1.Runnable(
                             container=batch_v1.Runnable.Container(
