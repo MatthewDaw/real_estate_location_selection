@@ -4,7 +4,7 @@ import hashlib
 from datetime import datetime
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
-from real_estate_location_selection.scrapers._scraper import _Scraper
+from real_estate_location_selection.scrapers._scraper import _Scraper, Task
 
 
 class Zillow(_Scraper):
@@ -13,8 +13,12 @@ class Zillow(_Scraper):
     use_resource_intercept = False
 
     def __init__(self, browser):
-        super().__init__(browser)
+        super().__init__(browser, "zillow-job-queue")
         self._ensure_tables_exist()
+        self.num_processed = 0
+        self.num_added = 0
+        self.total_batches_processed = 0
+
 
     def _ensure_tables_exist(self):
         """Create BigQuery tables if they don't exist."""
@@ -142,7 +146,7 @@ class Zillow(_Scraper):
             "https://www.zillow.com/xml/indexes/us/hdp/for-sale-by-owner.xml.gz",
         ]
 
-        total_batches_processed = 0
+        self.total_batches_processed = 0
 
         for sitemap_url in sitemap_urls:
             listing_type = sitemap_url.split('/')[-1].replace('.xml.gz', '')
@@ -161,44 +165,68 @@ class Zillow(_Scraper):
                 # When batch is full, process it
                 if len(batch_entries) >= batch_size:
                     self._insert_url_batch(batch_entries)
-                    total_batches_processed += 1
-                    print(f"Processed batch {total_batches_processed} with {len(batch_entries)} URLs")
+                    self.total_batches_processed += 1
+                    print(f"Processed batch {self.total_batches_processed} with {len(batch_entries)} URLs")
                     batch_entries.clear()
                     return
 
             # Handle remaining entries for this sitemap
             if batch_entries:
                 self._insert_url_batch(batch_entries)
-                total_batches_processed += 1
-                print(f"Processed final batch {total_batches_processed} with {len(batch_entries)} URLs")
+                self.total_batches_processed += 1
+                print(f"Processed final batch {self.total_batches_processed} with {len(batch_entries)} URLs")
 
             print(f"Completed sitemap: {listing_type}")
 
-        print(f"Total batches processed: {total_batches_processed}")
+        print(f"Total batches processed: {self.total_batches_processed}")
 
     def _insert_url_batch(self, entries):
         """Insert batch of URLs into BigQuery with upsert logic."""
         table_id = f"{self.project_id}.{self.dataset_id}.zillow_urls"
 
-        # Convert entries to the format expected by BigQuery
-        formatted_entries = []
-        for entry in entries:
-            formatted_entries.append({
-                'url': entry['url'],
-                'type': entry['type'],
-                'created_at': entry['created_at']
-            })
+        # Check existing URLs to avoid duplicates
+        existing_check_query = f"""
+        SELECT url
+        FROM `{table_id}`
+        WHERE url IN UNNEST(@urls)
+        """
 
-        if formatted_entries:
+        urls = [entry['url'] for entry in entries]
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ArrayQueryParameter("urls", "STRING", urls)
+            ]
+        )
+
+        existing_job = self.client.query(existing_check_query, job_config=job_config)
+        existing_urls = {row.url for row in existing_job.result()}
+
+        # Filter out existing entries
+        new_entries = [
+            entry for entry in entries
+            if entry['url'] not in existing_urls or True
+        ]
+
+        if new_entries:
+            # Convert entries to the format expected by BigQuery
+            formatted_entries = []
+            for entry in new_entries:
+                formatted_entries.append({
+                    'url': entry['url'],
+                    'type': entry['type'],
+                    'created_at': entry['created_at']
+                })
+
             # Insert new entries using load_table_from_json
             job_config = bigquery.LoadJobConfig(
                 write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
                 source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
             )
-
             job = self.client.load_table_from_json(formatted_entries, table_id, job_config=job_config)
             job.result()  # Wait for job to complete
-            print(f"Inserted {len(formatted_entries)} new URLs (skipped {len(entries) - len(formatted_entries)} duplicates)")
+            print(
+                f"Inserted {len(formatted_entries)} new URLs (skipped {len(entries) - len(formatted_entries)} duplicates)")
         else:
             print(f"Skipped {len(entries)} URLs (all duplicates)")
 
@@ -361,63 +389,59 @@ class Zillow(_Scraper):
         ]
         return {k: data.get(k) for k in keys if data.get(k)}
 
+    def process_urls(self, urls):
+        if not urls:
+            print("No more URLs to scrape")
+            return
+
+        batch_entries = []
+        urls_to_update = []
+
+        for url in urls:
+            self.num_processed += 1
+
+            print(f"extracting zillow url {url} (processed: {self.num_processed}, added: {self.num_added})")
+            try:
+                data = self.extract_from_website(url)
+                if data:
+                    safe_data = self._prepare_data_for_db(data)
+                    batch_entry = {
+                        'source_url': url,
+                        'created_at': datetime.utcnow().isoformat(),
+                        **safe_data
+                    }
+                    batch_entries.append(batch_entry)
+                    urls_to_update.append(url)
+            except Exception as e:
+                print(f"Error processing URL {url}: {e}")
+                raise Exception(f"Error processing URL {url}: {e}")
+
+        # Insert the batch
+        self.num_added += len(batch_entries)
+        self._insert_property_batch(batch_entries, urls_to_update)
+        print(f"uploaded batch of {len(batch_entries)} (total added: {self.num_added})")
+        self.total_batches_processed += 1
+
     def process_tasks(self, max_properties=10000, start_offset=0, batch_size=50):
         """
         Process scraping tasks using BigQuery.
         """
-        num_added = 0
-        num_processed = start_offset
-        total_batches_processed = 0
+        self.num_added = 0
+        self.num_processed = start_offset
+        self.total_batches_processed = 0
 
         try:
-            while num_added < max_properties:
+            while self.num_added < max_properties:
                 # Get URLs to process
-                urls = self._fetch_urls_to_scrape(limit=batch_size, offset=num_processed)
-                if not urls:
-                    print("No more URLs to scrape")
-                    return
-
-                batch_entries = []
-                urls_to_update = []
-
-                for url_row in urls:
-                    url = url_row.url
-                    num_processed += 1
-
-                    print(f"extracting zillow url {url} (processed: {num_processed}, added: {num_added})")
-                    try:
-                        data = self.extract_from_website(url)
-                        if data:
-                            safe_data = self._prepare_data_for_db(data)
-                            batch_entry = {
-                                'source_url': url,
-                                'created_at': datetime.utcnow().isoformat(),
-                                **safe_data
-                            }
-                            batch_entries.append(batch_entry)
-                            urls_to_update.append(url)
-                    except Exception as e:
-                        print(f"Error processing URL {url}: {e}")
-                        continue
-
-                # Insert the batch
-                if batch_entries:
-                    num_added += len(batch_entries)
-                    self._insert_property_batch(batch_entries, urls_to_update)
-                    print(f"uploaded batch of {len(batch_entries)} (total added: {num_added})")
-                    total_batches_processed += 1
-
-                # If we got fewer URLs than requested, we're done
-                if len(urls) < batch_size:
-                    print("Reached end of available URLs")
-                    return
+                urls = self._fetch_urls_to_scrape(limit=batch_size, offset=self.num_processed)
+                self.process_urls([el.url for el in urls])
 
         except Exception as e:
             print(f"Error during processing: {e}")
-            print(f"Resume with: process_tasks(start_offset={num_processed})")
+            print(f"Resume with: process_tasks(start_offset={self.num_processed})")
             raise e
 
-        print(f"Complete: {num_added} added, {num_processed} processed, {total_batches_processed} batches")
+        print(f"Complete: {self.num_added} added, {self.num_processed} processed, {self.total_batches_processed} batches")
 
     def _fetch_urls_to_scrape(self, limit=1000, offset=0):
         """

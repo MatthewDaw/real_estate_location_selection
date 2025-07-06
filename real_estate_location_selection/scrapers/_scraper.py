@@ -8,7 +8,7 @@ import uuid
 import random
 from datetime import datetime, timezone
 from multiprocessing.pool import ThreadPool
-from typing import TypedDict
+from typing import TypedDict, Union
 
 from google.cloud import bigquery, pubsub_v1
 from playwright.sync_api import Browser, BrowserContext, Page, Request, Route
@@ -17,7 +17,7 @@ from real_estate_location_selection.scrapers.utils.session import Session
 
 class Task(TypedDict):
     source: str
-    lastmod: str
+    sitemap_updated_at: Union[str, None]
     input: str
     now: str
 
@@ -36,14 +36,14 @@ class _Scraper:
     use_proxies_camoufox = False
     use_resource_intercept = True
 
-    def __init__(self, browser: Browser, default_timeout=10000):
+    def __init__(self, browser: Browser, topic_id, default_timeout=10000):
         if self.source is None:
             raise Exception("Assign a source name")
         self.session = Session()
         self.bigquery_client = bigquery.Client()
         self.pubsub_client = pubsub_v1.PublisherClient()
         self.topic_path = self.pubsub_client.topic_path(
-            "flowing-flame-464314-j5", "scraper-residential-topic"
+            "flowing-flame-464314-j5", topic_id
         )
         self.now = datetime.now(timezone.utc).date().isoformat()
         self._browser = browser
@@ -76,7 +76,7 @@ class _Scraper:
             SELECT
                 DISTINCT
                 loc,
-                FORMAT_TIMESTAMP("%Y-%m-%dT%X", lastmod) AS lastmod
+                FORMAT_TIMESTAMP("%Y-%m-%dT%X", sitemap_updated_at) AS sitemap_updated_at
             FROM `flowing-flame-464314-j5.rentsource.sitemap`
             WHERE created_on > "2023-01-01"
                 AND source = '{self.source}';
@@ -84,7 +84,7 @@ class _Scraper:
         table = self.bigquery_client.query(query).result().to_arrow()
         for batch in table.to_batches():
             for row in batch.to_pylist():
-                previous_sitemap.add((row["loc"], row["lastmod"]))
+                previous_sitemap.add((row["loc"], row["sitemap_updated_at"]))
         return previous_sitemap
 
     def _get_shuffled_valid_tasks(self):
@@ -106,80 +106,14 @@ class _Scraper:
                 valid_tasks.append(
                     {
                         "source": row["source"],
-                        "lastmod": row["lastmod"],
+                        "sitemap_updated_at": row["sitemap_updated_at"],
                         "input": row["input"],
                         "now": row["now"].isoformat(),
                     }
                 )
         return valid_tasks
 
-    def fill_tasks(self, target_count: int):
-        """Ingest the implemented prepare_tasks function. Push the valid tasks
-        into the Queue for processing and the unchanged tasks into BigQuery
-        sitemap directly since no scrape needs to take place. We shuffle the
-        tasks once the number of sources in today's staging table equals the
-        number of sources or the target_count.
-        """
-        previous_run = self._get_previous_sitemap()
-        valid_tasks: list[dict[str, str]] = []
-        unchanged_rows: set[tuple[str, str]] = []
-        current_queue: set[str] = set()
-        for url, lastmod in self.prepare_tasks():
-            if url in current_queue:
-                # Duplicates may find their way here, make sure to skip those.
-                continue
-            current_queue.add(url)
-            clean_last_mod = lastmod.split(".")[0].replace("Z", "") if lastmod else None
-            if lastmod is None or (url, clean_last_mod) not in previous_run:
-                valid_tasks.append({"input": url, "lastmod": lastmod})
-            elif lastmod:
-                unchanged_rows.append((url, lastmod))
-        for i in range(0, len(unchanged_rows), 1000):
-            self.bigquery_client.insert_rows_json(
-                "rentsource.sitemap",
-                [
-                    {
-                        "source": self.source,
-                        "loc": loc,
-                        "lastmod": lastmod,
-                        "created_on": self.now,
-                        "folder_id": str(uuid.uuid5(uuid.NAMESPACE_DNS, loc)),
-                    }
-                    for loc, lastmod in unchanged_rows[i : i + 1000]
-                ],
-            )
-        assert len(valid_tasks) > 0
-        # Because we want to process all tasks in a random order, we need to
-        # first push all tasks to BigQuery before we can randomly insert them
-        # into Pub/Sub
-        for i in range(0, len(valid_tasks), 1000):
-            self.bigquery_client.insert_rows_json(
-                "rentsource.__scraper_tasks",
-                [
-                    {
-                        "source": self.source,
-                        "lastmod": task["lastmod"],
-                        "input": task["input"],
-                        "now": self.now,
-                    }
-                    for task in valid_tasks[i : i + 1000]
-                ],
-            )
-        # Once we have tasks for all sources, let's initialize the queue.
-        bigquery_row = self.bigquery_client.query(
-            f"""
-            SELECT
-                DISTINCT source
-            FROM rentsource.__scraper_tasks
-            WHERE now = "{self.now}"
-        """
-        )
-        total_rows: int = bigquery_row.result().total_rows
-        if total_rows == target_count:
-            with ThreadPool(50) as p:
-                p.map(self._send_task, self._get_shuffled_valid_tasks())
-
-    def _send_task(self, task: Task):
+    def send_task(self, task: Task):
         """Send the task to Pub/Sub. Wrap in an infinite loop because sometimes
         Google can fail us and we want to infinitely try until it works.
         """
@@ -389,7 +323,7 @@ class _Scraper:
             time.sleep(random.randint(2, 12))
             raise e
 
-    def goto_url(self, url: str):
+    def goto_url(self, url: str, attempt=0):
         """Safely visit a url, making sure that when the function finishes, it
         for certain is on the requested url.
         """
@@ -397,7 +331,9 @@ class _Scraper:
         try:
             self._safe_goto(page, url)
         except Exception:
-            return self.goto_url(url)
+            if attempt > 12:
+                raise Exception("Go to url failed")
+            return self.goto_url(url, attempt + 1)
 
     def _browser_robot_detected(self, content: str):
         """Sometimes we get flagged by a robot detection service like

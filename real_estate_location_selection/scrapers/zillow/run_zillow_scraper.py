@@ -1,23 +1,16 @@
 
-from camoufox.sync_api import Camoufox
 from real_estate_location_selection.scrapers.zillow.zillow_scraper import Zillow
+from scrapers.utils.common_functions import get_browser
 
-
-def get_browser():
-    browser = Camoufox(
-        humanize=True,
-        firefox_user_prefs={
-            "javascript.enabled": False,
-            "permissions.default.image": 2,  # Block images
-            "permissions.default.stylesheet": 2,  # Block CSS
-            "permissions.default.font": 2,  # Block fonts
-            "permissions.default.script": 2,  # Block JavaScript
-            "permissions.default.plugin": 2,  # Block plugins
-            "permissions.default.autoplay": 2,  # Block autoplay media
-            "permissions.default.geo": 2,  # Block geolocation
-        },
-    ).start()
-    return browser
+# # projects/flowing-flame-464314-j5/topics/landwatch-job-queue
+# # projects/flowing-flame-464314-j5/subscriptions/landwatch-job-queue-sub
+#
+# # projects/flowing-flame-464314-j5/subscriptions/landwatch-job-queue-sub
+# # projects/flowing-flame-464314-j5/topics/landwatch-job-queue
+# # subscription_name: str, dead_letter_topic
+# # projects/flowing-flame-464314-j5/topics/landwatch-dlq
+# def run_scraper():
+#     TopicManager(project_id='flowing-flame-464314-j5', subscription_name='landwatch-job-queue-sub', dead_letter_topic='landwatch-dlq')
 
 def run_scraper():
     print("zillow scraper started")
@@ -26,7 +19,7 @@ def run_scraper():
     print("preparing zillow scraper tasks")
     scraper.prepare_tasks()
     print("processing zillow scraper tasks")
-    scraper.process_tasks()
+    # scraper.process_tasks()
     print("pause")
 
 if __name__ == '__main__':

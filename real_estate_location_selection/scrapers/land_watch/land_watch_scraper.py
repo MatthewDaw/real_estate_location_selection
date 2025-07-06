@@ -5,9 +5,10 @@ from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 from bs4 import BeautifulSoup
 from haversine import haversine, Unit
-from real_estate_location_selection.scrapers._scraper import _Scraper
+from real_estate_location_selection.scrapers._scraper import _Scraper, Task
 from real_estate_location_selection.scrapers.utils.common_functions import safe_get, safe_lower, safe_divide
 import hashlib
+from datetime import datetime, timezone
 
 class Landwatch(_Scraper):
     """
@@ -19,8 +20,11 @@ class Landwatch(_Scraper):
     use_resource_intercept = False
 
     def __init__(self, browser):
-        super().__init__(browser)
+        super().__init__(browser, "landwatch-job-queue")
         self._ensure_tables_exist()
+        self.num_processed = 0
+        self.total_batches_processed = 0
+        self.num_added = 0
 
     def _ensure_tables_exist(self):
         """Create BigQuery tables if they don't exist."""
@@ -108,7 +112,7 @@ class Landwatch(_Scraper):
         """
         page = 1
         state_abbr = state_abbreviation.upper()
-        total_batches_processed = 0
+        self.total_batches_processed = 0
 
         while True:
             batch_entries = []
@@ -127,9 +131,9 @@ class Landwatch(_Scraper):
                     print(f"No more links found at page {page}. Ending crawl.")
                     if batch_entries:
                         self._insert_url_batch(batch_entries)
-                        total_batches_processed += 1
+                        self.total_batches_processed += 1
                         print(f"Final batch: processed {len(batch_entries)} URLs")
-                    print(f"Total batches processed: {total_batches_processed}")
+                    print(f"Total batches processed: {self.total_batches_processed}")
                     return
 
                 # Add URLs to batch
@@ -137,7 +141,7 @@ class Landwatch(_Scraper):
                     batch_entries.append({
                         'url': f"https://www.landwatch.com{link}",
                         'state': state_abbr,
-                        'created_at': datetime.utcnow().isoformat()
+                        'created_at': datetime.now(timezone.utc).isoformat(),
                     })
 
                 print(f"Page {page}: Found {len(links)} URLs")
@@ -146,8 +150,8 @@ class Landwatch(_Scraper):
             # Insert batch when full
             if batch_entries:
                 self._insert_url_batch(batch_entries)
-                total_batches_processed += 1
-                print(f"Batch {total_batches_processed}: processed pages {batch_start_page}-{page-1} with {len(batch_entries)} URLs")
+                self.total_batches_processed += 1
+                print(f"Batch {self.total_batches_processed}: processed pages {batch_start_page}-{page-1} with {len(batch_entries)} URLs")
 
     def _insert_url_batch(self, entries):
         """Insert batch of URLs into BigQuery with upsert logic."""
@@ -174,9 +178,8 @@ class Landwatch(_Scraper):
         # Filter out existing entries
         new_entries = [
             entry for entry in entries
-            if entry['url'] not in existing_urls
+            if entry['url'] not in existing_urls or True
         ]
-
         if new_entries:
             # Insert new entries using load_table_from_json
             job_config = bigquery.LoadJobConfig(
@@ -348,14 +351,13 @@ class Landwatch(_Scraper):
         }
         return lot_size, lot_types, details
 
-    def extract_from_website(self, url: str, state_abbr: str):
+    def extract_from_website(self, url: str):
         """
         Visit the property URL and extract all structured data fields needed
         to represent a land property listing.
 
         Args:
             url (str): The full property URL.
-            state_abbr (str): The two-letter abbreviation of the state.
 
         Returns:
             dict: A dictionary of cleaned and normalized property data.
@@ -546,54 +548,49 @@ class Landwatch(_Scraper):
 
         print(f"Inserted batch of {len(entries)} property details and updated scraped_at")
 
+    def process_urls(self, urls):
+        batch_entries = []
+        urls_to_update = []
+
+        for url in urls:
+            self.num_processed += 1
+
+            print(f"extracting landwatch url {url} (processed: {self.num_processed}, added: {self.num_added})")
+            try:
+                data = self.extract_from_website(url)
+                if data:
+                    safe_data = self._prepare_data_for_db(data)
+                    batch_entry = {
+                        'url': url,
+                        'created_at': datetime.utcnow().isoformat(),
+                        **safe_data
+                    }
+                    batch_entries.append(batch_entry)
+                    urls_to_update.append(url)
+            except Exception as e:
+                print(f"Error processing URL {url}: {e}")
+                raise Exception(f"Error processing URL {url}: {e}")
+
+        self._insert_property_batch(batch_entries, urls_to_update)
+
     def process_tasks(self, max_properties=None, start_offset=0, batch_size=50):
         """
         Process scraping tasks using BigQuery.
         Fetch all URLs from `landwatch_urls` that have not yet been scraped.
         For each, extract data, upload it to BigQuery, and mark the URL as scraped.
         """
-        num_added = 0
-        num_processed = start_offset
-        total_batches_processed = 0
+        self.num_added = 0
+        self.num_processed = start_offset
+        self.total_batches_processed = 0
 
         try:
-            while max_properties is None or num_added < max_properties:
+            while max_properties is None or self.num_added < max_properties:
                 # Get URLs to process
                 urls = self._fetch_urls_to_scrape(limit=batch_size)
-                if not urls:
-                    print("No more URLs to scrape")
-                    return
-
-                batch_entries = []
-                urls_to_update = []
-
-                for url_row in urls:
-                    url = url_row.url
-                    state = url_row.state
-                    num_processed += 1
-
-                    print(f"extracting landwatch url {url} (processed: {num_processed}, added: {num_added})")
-                    try:
-                        data = self.extract_from_website(url, state)
-                        if data:
-                            safe_data = self._prepare_data_for_db(data)
-                            batch_entry = {
-                                'url': url,
-                                'created_at': datetime.utcnow().isoformat(),
-                                **safe_data
-                            }
-                            batch_entries.append(batch_entry)
-                            urls_to_update.append(url)
-                    except Exception as e:
-                        print(f"Error processing URL {url}: {e}")
-                        continue
-
-                # Insert the batch
-                if batch_entries:
-                    num_added += len(batch_entries)
-                    self._insert_property_batch(batch_entries, urls_to_update)
-                    print(f"uploaded batch of {len(batch_entries)} (total added: {num_added})")
-                    total_batches_processed += 1
+                self.process_urls([el.url for el in urls])
+                self.total_batches_processed += 1
+                self.num_processed += len(urls)
+                print(f"uploaded batch of {len(urls)} (total added: num_processed)")
 
                 # If we got fewer URLs than requested, we're done
                 if len(urls) < batch_size:
@@ -602,7 +599,6 @@ class Landwatch(_Scraper):
 
         except Exception as e:
             print(f"Error during processing: {e}")
-            print(f"Resume with: process_tasks(start_offset={num_processed})")
             raise e
 
-        print(f"Complete: {num_added} added, {num_processed} processed, {total_batches_processed} batches")
+        print(f"Complete: {self.num_added} added, {self.num_processed} processed, {self.total_batches_processed} batches")
