@@ -1,5 +1,5 @@
 from camoufox.sync_api import Camoufox
-from scrapers.utils.common_functions import get_browser
+from real_estate_location_selection.scrapers.utils.common_functions import get_browser
 
 def run_scrape():
     scraper = ApartmentListScraper(browser)

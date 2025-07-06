@@ -1,7 +1,7 @@
 
 from camoufox.sync_api import Camoufox
 from real_estate_location_selection.scrapers.land_watch.land_watch_scraper import Landwatch
-from scrapers.utils.common_functions import get_browser
+from real_estate_location_selection.scrapers.utils.common_functions import get_browser
 
 urls = [
     "/alabama-land-for-sale",

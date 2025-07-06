@@ -2,8 +2,8 @@ import time
 from distributed_job_loader import DistributedJobLoader
 from real_estate_location_selection.scrapers.land_watch.land_watch_scraper import Landwatch
 from real_estate_location_selection.scrapers.zillow.zillow_scraper import Zillow
-from scrapers.utils.common_functions import get_browser
-from scrapers.utils.topic_manager import TopicManager
+from real_estate_location_selection.scrapers.utils.common_functions import get_browser
+from real_estate_location_selection.scrapers.utils.topic_manager import TopicManager
 
 scrapers_config = {
     "dataset": "real_estate",

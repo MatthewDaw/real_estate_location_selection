@@ -534,7 +534,7 @@ class Landwatch(_Scraper):
         WHERE state in ('{"','".join(self.states_to_scrape)}')
         GROUP BY url
         HAVING COUNTIF(scraped_at IS NOT NULL) = 0
-        ORDER BY url
+        ORDER BY RAND()
         LIMIT {limit}
         """
         query_job = self.client.query(query)

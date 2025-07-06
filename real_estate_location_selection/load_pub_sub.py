@@ -5,8 +5,8 @@ Task sender script for sending scraper URLs to Pub/Sub queues.
 
 from datetime import datetime
 from real_estate_location_selection.scrapers._scraper import Task
-from scrapers.land_watch.land_watch_scraper import Landwatch
-from scrapers.zillow.zillow_scraper import Zillow
+from real_estate_location_selection.scrapers.land_watch.land_watch_scraper import Landwatch
+from real_estate_location_selection.scrapers.zillow.zillow_scraper import Zillow
 
 class TaskSender:
     """Sends scraping tasks to Pub/Sub queues from database URLs"""

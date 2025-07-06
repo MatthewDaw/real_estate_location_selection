@@ -11,6 +11,14 @@ class Zillow(_Scraper):
     source = "zillow"
     use_proxies_camoufox = True
     use_resource_intercept = False
+    states_to_scrape = [
+        'UT',
+        'ID',
+        'NV',
+        'AZ',
+        'CO',
+        'WY'
+    ]
 
     def __init__(self, browser):
         super().__init__(browser, "zillow-job-queue")
@@ -476,9 +484,10 @@ class Zillow(_Scraper):
         query = f"""
         SELECT url
         FROM `{self.project_id}.{self.dataset_id}.zillow_urls`
+        WHERE state in ('{"','".join(self.states_to_scrape)}')
         GROUP BY url
         HAVING COUNTIF(scraped_at IS NOT NULL) = 0
-        ORDER BY url
+        ORDER BY RAND()
         LIMIT {limit}
         """
 
