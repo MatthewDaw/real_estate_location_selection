@@ -168,7 +168,6 @@ class Zillow(_Scraper):
                     self.total_batches_processed += 1
                     print(f"Processed batch {self.total_batches_processed} with {len(batch_entries)} URLs")
                     batch_entries.clear()
-                    return
 
             # Handle remaining entries for this sitemap
             if batch_entries:
