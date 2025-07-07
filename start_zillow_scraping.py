@@ -12,11 +12,11 @@ request = batch_v1.CreateJobRequest(
         name=f"{parent}/jobs/{job_id}",
         task_groups=[
             batch_v1.TaskGroup(
-                task_count=20,  # Changed to 20 tasks
-                parallelism=20,  # Run all 20 tasks in parallel
+                task_count=2,  # Changed to 20 tasks
+                parallelism=2,  # Run all 20 tasks in parallel
                 task_spec=batch_v1.TaskSpec(
                     compute_resource=batch_v1.ComputeResource(
-                        cpu_milli=1000,
+                        cpu_milli=2000,
                         memory_mib=2048
                     ),
                     max_retry_count=10,  # Maximum allowed retry count
