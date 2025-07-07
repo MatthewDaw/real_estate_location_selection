@@ -58,7 +58,15 @@ request = batch_v1.CreateJobRequest(
                         provisioning_model="SPOT"  # Changed to preemptible instances
                     )
                 )
-            ]
+            ],
+            network=batch_v1.AllocationPolicy.NetworkPolicy(
+                network_interfaces=[
+                    batch_v1.AllocationPolicy.NetworkInterface(
+                        network="projects/flowing-flame-464314-j5/global/networks/default",
+                        no_external_ip_address=True
+                    )
+                ]
+            )
         ),
         logs_policy=batch_v1.LogsPolicy(destination="CLOUD_LOGGING"),
     ),

@@ -12,20 +12,19 @@ request = batch_v1.CreateJobRequest(
         name=f"{parent}/jobs/{job_id}",
         task_groups=[
             batch_v1.TaskGroup(
-                task_count=20,  # Changed to 20 tasks
-                parallelism=20,  # Run all 20 tasks in parallel
+                task_count=20,
+                parallelism=20,
                 task_spec=batch_v1.TaskSpec(
                     compute_resource=batch_v1.ComputeResource(
                         cpu_milli=1000,
                         memory_mib=2048
                     ),
-                    max_retry_count=10,  # Maximum allowed retry count
-                    max_run_duration="86400s",  # 20 hours timeout (20 * 60 * 60 = 72000 seconds)
+                    max_retry_count=10,
+                    max_run_duration="86400s",
                     runnables=[
                         batch_v1.Runnable(
                             container=batch_v1.Runnable.Container(
                                 image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest",
-                                # Override the container's default entrypoint/command
                                 entrypoint="sh",
                                 commands=[
                                     "-c",
@@ -41,8 +40,8 @@ request = batch_v1.CreateJobRequest(
                                     "EVOMI_USERNAME": os.getenv("EVOMI_USERNAME"),
                                     "EVOMI_PASSWORD": os.getenv("EVOMI_PASSWORD"),
                                     "INSTANCE_CONNECTION_NAME": "flowing-flame-464314-j5:us-central1:matt-sandbox",
-                                    "BATCH_TASK_INDEX": "${BATCH_TASK_INDEX}",  # Task index for differentiation (0-19)
-                                    "DISPLAY": ":99"  # Set display environment variable
+                                    "BATCH_TASK_INDEX": "${BATCH_TASK_INDEX}",
+                                    "DISPLAY": ":99"
                                 }
                             ),
                         )
@@ -55,10 +54,18 @@ request = batch_v1.CreateJobRequest(
                 batch_v1.AllocationPolicy.InstancePolicyOrTemplate(
                     policy=batch_v1.AllocationPolicy.InstancePolicy(
                         machine_type="e2-small",
-                        provisioning_model="PREEMPTIBLE"  # Changed to preemptible instances
+                        provisioning_model="PREEMPTIBLE"
                     )
                 )
-            ]
+            ],
+            network=batch_v1.AllocationPolicy.NetworkPolicy(
+                network_interfaces=[
+                    batch_v1.AllocationPolicy.NetworkInterface(
+                        network="projects/flowing-flame-464314-j5/global/networks/default",
+                        no_external_ip_address=True
+                    )
+                ]
+            )
         ),
         logs_policy=batch_v1.LogsPolicy(destination="CLOUD_LOGGING"),
     ),
