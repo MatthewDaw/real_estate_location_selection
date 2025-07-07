@@ -17,7 +17,7 @@ request = batch_v1.CreateJobRequest(
                 task_spec=batch_v1.TaskSpec(
                     compute_resource=batch_v1.ComputeResource(
                         cpu_milli=1000,
-                        memory_mib=1024
+                        memory_mib=2048
                     ),
                     max_retry_count=10,  # Maximum allowed retry count
                     max_run_duration="86400s",  # 20 hours timeout (20 * 60 * 60 = 72000 seconds)
@@ -54,7 +54,7 @@ request = batch_v1.CreateJobRequest(
             instances=[
                 batch_v1.AllocationPolicy.InstancePolicyOrTemplate(
                     policy=batch_v1.AllocationPolicy.InstancePolicy(
-                        machine_type="e2-small",
+                        machine_type="e2-standard-2",
                         provisioning_model="SPOT",  # Changed to preemptible instances
                         boot_disk=batch_v1.AllocationPolicy.Disk(
                             type_="pd-standard",  # Use standard persistent disk instead of SSD
