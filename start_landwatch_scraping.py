@@ -16,7 +16,7 @@ request = batch_v1.CreateJobRequest(
                 parallelism=20,  # Run all 20 tasks in parallel
                 task_spec=batch_v1.TaskSpec(
                     compute_resource=batch_v1.ComputeResource(
-                        cpu_milli=2000,
+                        cpu_milli=1000,
                         memory_mib=2048
                     ),
                     max_retry_count=10,  # Maximum allowed retry count
