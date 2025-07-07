@@ -54,7 +54,7 @@ request = batch_v1.CreateJobRequest(
                 batch_v1.AllocationPolicy.InstancePolicyOrTemplate(
                     policy=batch_v1.AllocationPolicy.InstancePolicy(
                         machine_type="e2-small",
-                        provisioning_model="PREEMPTIBLE"
+                        provisioning_model="SPOT"
                     )
                 )
             ],
@@ -62,6 +62,7 @@ request = batch_v1.CreateJobRequest(
                 network_interfaces=[
                     batch_v1.AllocationPolicy.NetworkInterface(
                         network="projects/flowing-flame-464314-j5/global/networks/default",
+                        subnetwork="projects/flowing-flame-464314-j5/regions/us-west3/subnetworks/default",
                         no_external_ip_address=True
                     )
                 ]
