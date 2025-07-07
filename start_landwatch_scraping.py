@@ -17,7 +17,7 @@ request = batch_v1.CreateJobRequest(
                 task_spec=batch_v1.TaskSpec(
                     compute_resource=batch_v1.ComputeResource(
                         cpu_milli=1000,
-                        memory_mib=2048
+                        memory_mib=1024
                     ),
                     max_retry_count=10,
                     max_run_duration="86400s",
@@ -54,7 +54,11 @@ request = batch_v1.CreateJobRequest(
                 batch_v1.AllocationPolicy.InstancePolicyOrTemplate(
                     policy=batch_v1.AllocationPolicy.InstancePolicy(
                         machine_type="e2-small",
-                        provisioning_model="SPOT"
+                        provisioning_model="SPOT",
+                        boot_disk=batch_v1.AllocationPolicy.Disk(
+                            type_="pd-standard",  # Use standard persistent disk instead of SSD
+                            size_gb=10  # Specify smaller disk size (default might be too large)
+                        )
                     )
                 )
             ],
