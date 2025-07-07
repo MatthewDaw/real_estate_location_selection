@@ -58,7 +58,7 @@ request = batch_v1.CreateJobRequest(
                         provisioning_model="SPOT",  # Changed to preemptible instances
                         boot_disk=batch_v1.AllocationPolicy.Disk(
                             type_="pd-standard",  # Use standard persistent disk instead of SSD
-                            size_gb=10  # Specify smaller disk size (default might be too large)
+                            size_gb=30  # Specify smaller disk size (default might be too large)
                         )
                     )
                 )
