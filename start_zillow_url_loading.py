@@ -4,7 +4,7 @@ import time
 from google.cloud import batch_v1
 
 parent = "projects/flowing-flame-464314-j5/locations/us-west3"
-job_id = "flowing-flame-464314-j5-zillow-url-collection-%i" % int(time.time())
+job_id = "flowing-flame-464314-j5-zillow-url-loading-%i" % int(time.time())
 request = batch_v1.CreateJobRequest(
     parent=parent,
     job_id=job_id,
