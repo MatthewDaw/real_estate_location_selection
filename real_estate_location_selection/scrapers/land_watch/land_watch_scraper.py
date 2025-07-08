@@ -9,6 +9,7 @@ from real_estate_location_selection.scrapers._scraper import _Scraper, Task
 from real_estate_location_selection.scrapers.utils.common_functions import safe_get, safe_lower, safe_divide
 import hashlib
 from datetime import datetime, timezone
+from pathlib import Path
 
 class Landwatch(_Scraper):
     """
@@ -124,25 +125,59 @@ class Landwatch(_Scraper):
             table = self.client.create_table(table)
             print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
 
+            # Create landwatch_scraper_state table for tracking completed pages
+            state_table_id = f"{self.project_id}.{self.dataset_id}.landwatch_scraper_state"
+            state_schema = [
+                bigquery.SchemaField("state_abbr", "STRING", mode="REQUIRED"),
+                bigquery.SchemaField("page_number", "INTEGER", mode="REQUIRED"),
+                bigquery.SchemaField("completed_at", "TIMESTAMP", mode="REQUIRED"),
+            ]
+
+            try:
+                self.client.get_table(state_table_id)
+            except NotFound:
+                table = bigquery.Table(state_table_id, schema=state_schema)
+                table = self.client.create_table(table)
+                print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
+
+
     def prepare_tasks(self, state_source, state_abbreviation, pages_per_batch=2):
         """
         Extract URLs from LandWatch and insert them into BigQuery.
+        Tracks completed pages to avoid re-scraping on subsequent runs.
 
         Args:
             state_source (str): The URL path for the state (e.g., "/texas-land-for-sale").
             state_abbreviation (str): The 2-letter abbreviation of the state (e.g., "TX").
             pages_per_batch (int): Number of pages to process before batching (default: 25).
         """
-        page = 1
         state_abbr = state_abbreviation.upper()
         self.total_batches_processed = 0
+
+        # Initialize state tracking
+        state_file = self._get_state_file_path(state_abbr)
+        completed_pages = self._load_completed_pages(state_file)
+
+        # Find the starting page (next page after the highest completed page)
+        page = max(completed_pages) + 1 if completed_pages else 1
+
+        print(f"Starting from page {page} for {state_abbr}")
+        if completed_pages:
+            print(f"Previously completed pages: {sorted(completed_pages)}")
 
         while True:
             batch_entries = []
             batch_start_page = page
+            current_batch_pages = []
 
             # Process pages in batches
             for _ in range(pages_per_batch):
+                # Skip if this page was already completed
+                if page in completed_pages:
+                    print(f"Skipping page {page} - already completed")
+                    page += 1
+                    continue
+
                 url = f"https://www.landwatch.com{state_source}/page-{page}"
                 self.close_page()
                 self.goto_url(url)
@@ -156,6 +191,8 @@ class Landwatch(_Scraper):
                         self._insert_url_batch(batch_entries)
                         self.total_batches_processed += 1
                         print(f"Final batch: processed {len(batch_entries)} URLs")
+                        # Save completed pages for this final batch
+                        self._save_completed_pages(state_file, completed_pages.union(current_batch_pages))
                     print(f"Total batches processed: {self.total_batches_processed}")
                     return
 
@@ -168,13 +205,159 @@ class Landwatch(_Scraper):
                     })
 
                 print(f"Page {page}: Found {len(links)} URLs")
+                current_batch_pages.append(page)
                 page += 1
 
             # Insert batch when full
             if batch_entries:
-                self._insert_url_batch(batch_entries)
-                self.total_batches_processed += 1
-                print(f"Batch {self.total_batches_processed}: processed pages {batch_start_page}-{page-1} with {len(batch_entries)} URLs")
+                try:
+                    self._insert_url_batch(batch_entries)
+                    self.total_batches_processed += 1
+
+                    # Update completed pages after successful batch insert
+                    completed_pages.update(current_batch_pages)
+                    self._save_completed_pages(state_file, completed_pages)
+
+                    print(
+                        f"Batch {self.total_batches_processed}: processed pages {batch_start_page}-{page - 1} with {len(batch_entries)} URLs")
+
+                except Exception as e:
+                    print(f"Error inserting batch: {e}")
+                    print(f"Pages {current_batch_pages} will be retried on next run")
+                    raise
+
+    def _get_state_file_path(self, state_abbr):
+        """Get the path for the state tracking file."""
+        # Create a state directory if it doesn't exist
+        state_dir = Path("scraper_state")
+        state_dir.mkdir(exist_ok=True)
+        return state_dir / f"{state_abbr}_completed_pages.json"
+
+    def _load_completed_pages(self, state_abbr):
+        """Load completed pages from BigQuery."""
+        query = f"""
+        SELECT page_number
+        FROM `{self.project_id}.{self.dataset_id}.landwatch_scraper_state`
+        WHERE state_abbr = @state_abbr
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("state_abbr", "STRING", str(state_abbr))
+            ]
+        )
+
+        try:
+            query_job = self.client.query(query, job_config=job_config)
+            completed_pages = {row.page_number for row in query_job.result()}
+            return completed_pages
+        except Exception as e:
+            print(f"Warning: Could not load completed pages from BigQuery: {e}")
+            return set()
+
+    def _save_completed_pages(self, state_abbr, new_pages):
+        """Save completed pages to BigQuery."""
+        if not new_pages:
+            return
+
+        table_id = f"{self.project_id}.{self.dataset_id}.landwatch_scraper_state"
+
+        # Ensure all page numbers are integers (convert from any Path objects)
+        clean_pages = []
+        for page in new_pages:
+            if isinstance(page, (str, Path)):
+                # Extract numeric part if it's a path or string
+                page_str = str(page)
+                try:
+                    page_num = int(page_str)
+                    clean_pages.append(page_num)
+                except ValueError:
+                    print(f"Warning: Could not convert page '{page}' to integer, skipping")
+                    continue
+            elif isinstance(page, int):
+                clean_pages.append(page)
+            else:
+                print(f"Warning: Unexpected page type {type(page)}: {page}, skipping")
+                continue
+
+        if not clean_pages:
+            print("Warning: No valid page numbers to save")
+            return
+
+        # Prepare entries for new pages
+        entries = [
+            {
+                'state_abbr': str(state_abbr),
+                'page_number': int(page),
+                'completed_at': datetime.now(timezone.utc).isoformat()
+            }
+            for page in clean_pages
+        ]
+
+        try:
+            # Insert new completed pages
+            job_config = bigquery.LoadJobConfig(
+                write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+                source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+            )
+
+            job = self.client.load_table_from_json(entries, table_id, job_config=job_config)
+            job.result()  # Wait for job to complete
+
+            print(f"Saved {len(clean_pages)} completed pages to BigQuery for {state_abbr}")
+
+        except Exception as e:
+            print(f"Warning: Could not save completed pages to BigQuery: {e}")
+            # Debug info to help identify the issue
+            print(f"Debug - state_abbr type: {type(state_abbr)}, value: {state_abbr}")
+            print(f"Debug - new_pages types: {[type(p) for p in new_pages]}")
+            print(f"Debug - new_pages values: {list(new_pages)}")
+
+    def reset_state(self, state_abbreviation):
+        """Reset the state tracking for a specific state (useful for debugging)."""
+        state_abbr = state_abbreviation.upper()
+
+        delete_query = f"""
+        DELETE FROM `{self.project_id}.{self.dataset_id}.landwatch_scraper_state`
+        WHERE state_abbr = @state_abbr
+        """
+
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("state_abbr", "STRING", state_abbr)
+            ]
+        )
+
+        try:
+            query_job = self.client.query(delete_query, job_config=job_config)
+            query_job.result()
+            print(f"Reset state for {state_abbr}")
+        except Exception as e:
+            print(f"Error resetting state for {state_abbr}: {e}")
+
+    def get_state_summary(self, state_abbreviation):
+        """Get a summary of the current state for debugging."""
+        state_abbr = state_abbreviation.upper()
+        completed_pages = self._load_completed_pages(state_abbr)
+
+        if not completed_pages:
+            print(f"No completed pages found for {state_abbr}")
+            return
+
+        print(f"State summary for {state_abbr}:")
+        print(f"  Total completed pages: {len(completed_pages)}")
+        print(f"  Page range: {min(completed_pages)}-{max(completed_pages)}")
+        print(f"  Next page to process: {max(completed_pages) + 1}")
+
+        # Check for gaps
+        if completed_pages:
+            full_range = set(range(min(completed_pages), max(completed_pages) + 1))
+            gaps = full_range - completed_pages
+            if gaps:
+                print(f"  Missing pages: {sorted(gaps)}")
+            else:
+                print(f"  No gaps in completed pages")
+
 
     def _insert_url_batch(self, entries):
         """Insert batch of URLs into BigQuery with upsert logic."""

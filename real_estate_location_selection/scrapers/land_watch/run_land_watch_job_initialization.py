@@ -111,7 +111,8 @@ state_abbreviations = [
 
 def prepare_tasks(scraper):
     for url, state_abbreviation in zip(urls, state_abbreviations):
-        scraper.prepare_tasks(url, state_abbreviation)
+        if state_abbreviation in scraper.states_to_scrape:
+            scraper.prepare_tasks(url, state_abbreviation)
 
 def run_scraper():
     print("scraper started")
