@@ -141,7 +141,7 @@ class Landwatch(_Scraper):
                 print(f"Created table {table.project}.{table.dataset_id}.{table.table_id}")
 
 
-    def prepare_tasks(self, state_source, state_abbreviation, pages_per_batch=2):
+    def prepare_tasks(self, state_source, state_abbreviation, pages_per_batch=10):
         """
         Extract URLs from LandWatch and insert them into BigQuery.
         Tracks completed pages to avoid re-scraping on subsequent runs.
