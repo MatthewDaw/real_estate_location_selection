@@ -318,9 +318,9 @@ class _Scraper:
             if self._browser_robot_detected(page.content()):
                 raise Exception(f"{self.source} - Robot detected, goto_url")
         except Exception as e:
-            logging.info(e)
+            print("problem with goto: {}".format(e))
             self.close_page()
-            time.sleep(random.randint(2, 12))
+            time.sleep(random.randint(2, 15))
             raise e
 
     def goto_url(self, url: str, attempt=0):
