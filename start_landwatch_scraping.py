@@ -3,6 +3,7 @@ import os
 import time
 
 from google.cloud import batch_v1
+from google.protobuf import duration_pb2
 
 parent = "projects/flowing-flame-464314-j5/locations/us-west3"
 job_id = "flowing-flame-464314-j5-land-watch-collection-%i" % int(time.time())
@@ -16,6 +17,7 @@ request = batch_v1.CreateJobRequest(
                 task_count=10,
                 parallelism=10,
                 task_spec=batch_v1.TaskSpec(
+                    max_run_duration=duration_pb2.Duration(seconds=24 * 60 * 60),
                     compute_resource=batch_v1.ComputeResource(
                         cpu_milli=1000,
                         memory_mib=2048
