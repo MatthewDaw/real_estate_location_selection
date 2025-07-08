@@ -313,7 +313,7 @@ class _Scraper:
         """
         try:
             page.goto(
-                url, wait_until="domcontentloaded", referer="https://www.google.com"
+                url, wait_until="domcontentloaded", referer="https://www.google.com", timeout=100000
             )
             if self._browser_robot_detected(page.content()):
                 raise Exception(f"{self.source} - Robot detected, goto_url")
