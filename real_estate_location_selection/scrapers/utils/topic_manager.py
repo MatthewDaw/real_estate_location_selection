@@ -93,62 +93,38 @@ class TopicManager:
             # If we can't check, err on the side of caution and allow processing
             return False
 
-    def _mark_job_as_processing(self, url: str, scraper_source: str, process_id: str) -> bool:
-        """
-        Mark a job as currently being processed
+    def _mark_jobs_as_processing_batch(self, urls: List[str], scraper_source: str, process_id: str) -> List[str]:
+        if not urls:
+            return []
 
-        Returns True if successfully marked, False if another process is already processing it
-        """
-        job_hash = self._generate_job_hash(url, scraper_source)
         table_id = f"{self.project_id}.{self.dataset_id}.job_processing_log"
-
         now = datetime.utcnow()
-        expires_at = now + timedelta(minutes=90)  # Job expires after 90 minutes
+        expires_at = now + timedelta(minutes=90)
 
-        # Clean up any expired processing jobs first
+        # Clean up expired jobs first
         cleanup_query = f"""
         DELETE FROM `{table_id}`
         WHERE status = 'processing' AND expires_at < CURRENT_TIMESTAMP()
         """
-
         try:
             self.bigquery_client.query(cleanup_query).result()
         except Exception as e:
             print(f"Warning: Could not clean up expired jobs: {e}")
 
-        # Try to insert the processing record with proper FROM clause
-        insert_query = f"""
-        INSERT INTO `{table_id}` (job_hash, url, scraper_source, status, process_id, started_at, expires_at, retry_count)
-        SELECT @job_hash, @url, @scraper_source, 'processing', @process_id, @started_at, @expires_at, 0
-        FROM (SELECT 1) AS dummy
-        WHERE NOT EXISTS (
-            SELECT 1 FROM `{table_id}` 
+        # Insert jobs one by one to maintain the original conflict resolution logic
+        successful_urls = []
+
+        for url in urls:
+            job_hash = self._generate_job_hash(url, scraper_source)
+
+            # Check if job already exists first
+            check_existing_query = f"""
+            SELECT COUNT(*) as count FROM `{table_id}`
             WHERE job_hash = @job_hash 
             AND (
                 (status = 'completed' AND completed_at > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 HOUR))
                 OR (status = 'processing' AND expires_at > CURRENT_TIMESTAMP())
             )
-        )
-        """
-
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("job_hash", "STRING", job_hash),
-                bigquery.ScalarQueryParameter("url", "STRING", url),
-                bigquery.ScalarQueryParameter("scraper_source", "STRING", scraper_source),
-                bigquery.ScalarQueryParameter("process_id", "STRING", process_id),
-                bigquery.ScalarQueryParameter("started_at", "TIMESTAMP", now),
-                bigquery.ScalarQueryParameter("expires_at", "TIMESTAMP", expires_at),
-            ]
-        )
-
-        try:
-            result = self.bigquery_client.query(insert_query, job_config=job_config).result()
-
-            # Check if we actually got the job by verifying our process_id is in the table
-            check_query = f"""
-            SELECT process_id FROM `{table_id}`
-            WHERE job_hash = @job_hash AND status = 'processing' AND expires_at > CURRENT_TIMESTAMP()
             """
 
             check_config = bigquery.QueryJobConfig(
@@ -157,16 +133,44 @@ class TopicManager:
                 ]
             )
 
-            rows = list(self.bigquery_client.query(check_query, job_config=check_config).result())
+            try:
+                check_result = self.bigquery_client.query(check_existing_query, job_config=check_config).result()
+                existing_count = list(check_result)[0].count
 
-            if rows and rows[0].process_id == process_id:
-                return True
-            else:
-                return False
+                if existing_count > 0:
+                    continue  # Skip this URL, it's already processing or recently completed
 
-        except Exception as e:
-            print(f"Error marking job as processing: {e}")
-            return False
+            except Exception as e:
+                print(f"Error checking existing job for {url}: {e}")
+                continue
+
+            # Insert the job
+            insert_query = f"""
+            INSERT INTO `{table_id}` (job_hash, url, scraper_source, status, process_id, started_at, expires_at, retry_count)
+            VALUES (@job_hash, @url, @scraper_source, 'processing', @process_id, @started_at, @expires_at, 0)
+            """
+
+            job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("job_hash", "STRING", job_hash),
+                    bigquery.ScalarQueryParameter("url", "STRING", url),
+                    bigquery.ScalarQueryParameter("scraper_source", "STRING", scraper_source),
+                    bigquery.ScalarQueryParameter("process_id", "STRING", process_id),
+                    bigquery.ScalarQueryParameter("started_at", "TIMESTAMP", now),
+                    bigquery.ScalarQueryParameter("expires_at", "TIMESTAMP", expires_at),
+                ]
+            )
+
+            try:
+                result = self.bigquery_client.query(insert_query, job_config=job_config).result()
+                # If we get here without error, the row was inserted
+                successful_urls.append(url)
+            except Exception as e:
+                print(f"Error inserting job for {url}: {e}")
+                continue
+
+        print(f"Successfully marked {len(successful_urls)}/{len(urls)} jobs as processing")
+        return successful_urls
 
     def _mark_job_as_completed(self, url: str, scraper_source: str, process_id: str, success: bool = True,
                                error_message: str = None):
@@ -312,28 +316,41 @@ class TopicManager:
         else:
             valid_urls = set(urls_to_check)
 
-        # Second pass: mark valid jobs as processing and build final batch
+        # Second pass: collect URLs that need processing and build batches
         final_batch = []
         messages_to_nack = []
+        urls_to_mark = []
+        url_to_message = {}
 
         for message_data, url in batch_messages:
             if url is None:
                 # Include messages where we couldn't extract URL
                 final_batch.append(message_data)
             elif url in valid_urls:
-                # Try to mark as processing
                 if process_id and scraper_source:
-                    if self._mark_job_as_processing(url, scraper_source, process_id):
-                        final_batch.append(message_data)
-                    else:
-                        # Another process grabbed it
-                        messages_to_nack.append(message_data)
+                    # Collect for batch processing
+                    urls_to_mark.append(url)
+                    url_to_message[url] = message_data
                 else:
                     # No process tracking, just include it
                     final_batch.append(message_data)
             else:
                 # URL was recently processed, nack the message
                 messages_to_nack.append(message_data)
+
+        # Mark all valid URLs as processing in one batch call
+        if urls_to_mark and process_id and scraper_source:
+            successfully_marked_urls = set(
+                self._mark_jobs_as_processing_batch(urls_to_mark, scraper_source, process_id))
+
+            # Add successfully marked messages to final batch, nack the rest
+            for url in urls_to_mark:
+                message_data = url_to_message[url]
+                if url in successfully_marked_urls:
+                    final_batch.append(message_data)
+                else:
+                    # Another process grabbed it or other conflict
+                    messages_to_nack.append(message_data)
 
         # Nack messages that shouldn't be processed right now
         for message_data in messages_to_nack:
