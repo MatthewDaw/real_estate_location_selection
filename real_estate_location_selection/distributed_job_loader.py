@@ -172,6 +172,7 @@ class DistributedJobLoader:
             FROM `{source_table}`
             WHERE state IN ('UT', 'ID', 'NV', 'WY', 'MT', 'NH', 'CO', 'AZ', 'NM', 'TX', 'OK', 'KS', 'NE', 'IA', 'IL', 'MO', 'IN', 'AR', 'LA', 'MS', 'MI')
             AND scraped_at IS NULL
+            AND (last_pulled IS NULL OR last_pulled < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
             """
         elif self.scraper == "zillow":
             source_table = f"{self.project_id}.{self.dataset_id}.zillow_urls"
@@ -180,6 +181,7 @@ class DistributedJobLoader:
             FROM `{source_table}`
             WHERE state IN ('UT', 'ID', 'NV', 'AZ', 'CO', 'WY')
             AND scraped_at IS NULL
+            AND (last_pulled IS NULL OR last_pulled < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
             """
         else:
             return 0
@@ -282,6 +284,7 @@ class DistributedJobLoader:
         if queueable_count < self.jobs_per_batch:
             print(f"Only {queueable_count} jobs available to queue (less than batch size {self.jobs_per_batch})")
             if queueable_count == 0:
+                print("No queueable jobs to load")
                 return False
 
         # Create a TopicManager to filter URLs
