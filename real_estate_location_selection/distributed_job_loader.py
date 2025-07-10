@@ -14,7 +14,7 @@ from real_estate_location_selection.load_pub_sub import load_jobs_into_pub_sub
 class DistributedJobLoader:
     """Manages distributed job loading with BigQuery-based locking"""
 
-    def __init__(self, project_id, scraper, dataset_id="your_dataset", jobs_per_batch=1000):
+    def __init__(self, project_id, scraper, dataset_id="your_dataset", jobs_per_batch=5000):
         self.project_id = project_id
         self.scraper = scraper
         self.dataset_id = dataset_id

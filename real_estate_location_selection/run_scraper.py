@@ -23,54 +23,29 @@ scrapers_config = {
 }
 
 
-def run_scraper(scraper_source, max_empty_queue_attempts=5):
-    """
-    Run scraper with automatic job loading when queue is empty
-
-    Args:
-        scraper_source (str): "zillow" or "landwatch"
-        max_empty_queue_attempts (int): Maximum times to try loading jobs before terminating
-    """
-    browser = get_browser()
-    scraper = scrapers_config[scraper_source]["scraper"](browser)
+def pull_from_queue(scraper_source, max_empty_queue_attempts, batch_size):
     topic_manager = TopicManager(
         topic_name=scrapers_config[scraper_source]["topic_name"],
         project_id=scrapers_config['project_id'],
         subscription_name=scrapers_config[scraper_source]['subscription_name'],
         dead_letter_topic=scrapers_config[scraper_source]['dead_letter_topic']
     )
-
+    job_loader = DistributedJobLoader(scrapers_config['project_id'], scraper_source,
+                                      dataset_id=scrapers_config['dataset'])
     empty_queue_attempts = 0
-    messages_processed = 0
-
-    # Initialize job loader once
-    job_loader = DistributedJobLoader(scrapers_config['project_id'], scraper_source, dataset_id=scrapers_config['dataset'])
-    print(f"Starting {scraper_source} scraper...")
 
     while empty_queue_attempts < max_empty_queue_attempts:
-        # Try to pull a message
-        message_found = False
+        # Try to pull a batch of messages
+        message_batch = None
+        for batch in topic_manager.pull_messages_batch(batch_size):
+            message_batch = batch
+            break  # Only get the first batch from the generator
 
-        for message_data in topic_manager.pull_message():
-            message_found = True
-            messages_processed += 1
-            # https://www.zillow.com/homedetails/11814-S-Tuzigoot-Ct-Phoenix-AZ-85044/8150226_zpid/
-            try:
-                print(f"Processing message {messages_processed}: {message_data['data']['input']}")
-                scraper.process_urls([message_data['data']['input']])
-                topic_manager.delete_message(message_data['ack_id'])
-                print(f"Successfully processed message {messages_processed}")
-
-            except Exception as e:
-                print(f"Error processing message {messages_processed}: {e}")
-                topic_manager.delete_and_send_to_dlq(message_data)
-                # Exception automatically sends to DLQ via generator
-
-            # Reset empty queue counter since we found a message
-            empty_queue_attempts = 0
-
-        # If no message was found, try to load more jobs
-        if not message_found:
+        if message_batch:
+            yield message_batch
+            empty_queue_attempts = 0  # Reset counter since we got messages
+        else:
+            # If no message was found, try to load more jobs
             empty_queue_attempts += 1
             print(f"Queue empty (attempt {empty_queue_attempts}/{max_empty_queue_attempts})")
 
@@ -89,10 +64,31 @@ def run_scraper(scraper_source, max_empty_queue_attempts=5):
                     print(f"Waiting {wait_time} seconds before trying again...")
                     time.sleep(wait_time)
 
-    print(f"Terminating {scraper_source} scraper after {max_empty_queue_attempts} empty queue attempts")
-    print(f"Total messages processed: {messages_processed}")
 
+def run_scraper(scraper_source, max_empty_queue_attempts=5, batch_size=30):
+    """
+    Run scraper with automatic job loading when queue is empty
+
+    Args:
+        scraper_source (str): "zillow" or "landwatch"
+        max_empty_queue_attempts (int): Maximum times to try loading jobs before terminating
+        batch_size (int): Number of messages to process in each batch
+    """
+    browser = get_browser()
+    scraper = scrapers_config[scraper_source]["scraper"](browser)
+    topic_manager = TopicManager(
+        topic_name=scrapers_config[scraper_source]["topic_name"],
+        project_id=scrapers_config['project_id'],
+        subscription_name=scrapers_config[scraper_source]['subscription_name'],
+        dead_letter_topic=scrapers_config[scraper_source]['dead_letter_topic']
+    )
+    for message_data_batch in pull_from_queue(scraper_source, max_empty_queue_attempts, batch_size):
+        urls = [message_data['data']['input'] for message_data in message_data_batch]
+        urls_to_update = scraper.process_urls(urls)
+        for message_data in message_data_batch:
+            if message_data['data']['input'] in urls_to_update:
+                topic_manager.delete_message(message_data['ack_id'])
+            else:
+                topic_manager.send_to_dead_letter(message_data)
     # Clean up
     browser.close()
-
-

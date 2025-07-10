@@ -54,7 +54,7 @@ request = batch_v1.CreateJobRequest(
                 batch_v1.AllocationPolicy.InstancePolicyOrTemplate(
                     policy=batch_v1.AllocationPolicy.InstancePolicy(
                         machine_type="e2-small",
-                        provisioning_model="SPOT"
+                        provisioning_model="STANDARD",
                     )
                 )
             ],

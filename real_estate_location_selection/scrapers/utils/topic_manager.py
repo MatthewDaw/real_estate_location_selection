@@ -20,6 +20,48 @@ class TopicManager:
         if dead_letter_topic:
             self.dead_letter_topic_path = self.publisher.topic_path(project_id, dead_letter_topic)
 
+    def pull_messages_batch(self, batch_size=10):
+        """
+        Generator that yields a batch of message data and automatically handles cleanup.
+        On successful completion: deletes the messages
+        On exception: sends to dead letter queue (if configured)
+
+        Args:
+            batch_size (int): Number of messages to pull in each batch (default: 10)
+        """
+        pull_request = {
+            "subscription": self.subscription_path,
+            "max_messages": batch_size
+        }
+
+        response = self.subscriber.pull(request=pull_request)
+
+        if not response.received_messages:
+            return
+
+        batch_messages = []
+
+        for received_message in response.received_messages:
+            message = received_message.message
+
+            try:
+                # Try to parse as JSON, fall back to string
+                data = json.loads(message.data.decode('utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                data = message.data.decode('utf-8', errors='ignore')
+
+            message_data = {
+                'data': data,
+                'attributes': dict(message.attributes),
+                'message_id': message.message_id,
+                'publish_time': message.publish_time,
+                'ack_id': received_message.ack_id
+            }
+
+            batch_messages.append(message_data)
+
+        yield batch_messages
+
     def pull_message(self):
         """
         Generator that yields message data and automatically handles cleanup.
@@ -56,8 +98,6 @@ class TopicManager:
         try:
             # Yield the message for processing
             yield message_data
-            # If we get here, processing was successful - delete the message
-            self.delete_message(message_data['ack_id'])
 
         except Exception as e:
             print(f"Error processing message {message_data['message_id']}: {e}")
@@ -148,3 +188,54 @@ class TopicManager:
 
         print(f"✅ Emptied subscription '{self.subscription_name}': {total} messages deleted")
         return total
+
+    def send_to_dead_letter(self, message_data: Dict[str, Any], error_reason: str = None) -> bool:
+        """
+        Send a message to the dead letter queue and acknowledge the original message.
+
+        Args:
+            message_data (dict): The message data containing 'data', 'attributes', 'ack_id', etc.
+            error_reason (str, optional): Reason for sending to DLQ (for logging/debugging)
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.dead_letter_topic:
+            print("No dead letter topic configured, deleting message instead")
+            return self.delete_message(message_data['ack_id'])
+
+        try:
+            # Create the dead letter message payload
+            dlq_payload = {
+                'original_data': message_data['data'],
+                'original_attributes': message_data['attributes'],
+                'original_message_id': message_data['message_id'],
+                'original_publish_time': str(message_data['publish_time']),
+                'error_reason': error_reason,
+                'failed_at': time.time(),
+                'dlq_source': 'scraper_error'
+            }
+
+            # Publish to dead letter topic
+            future = self.publisher.publish(
+                self.dead_letter_topic_path,
+                json.dumps(dlq_payload).encode('utf-8'),
+                **message_data['attributes']  # Preserve original attributes
+            )
+
+            # Wait for publish to complete
+            message_id = future.result()
+            print(f"Message {message_data['message_id']} sent to dead letter queue with ID: {message_id}")
+
+            # Acknowledge the original message to remove it from the subscription
+            success = self.delete_message(message_data['ack_id'])
+
+            if success:
+                print(f"Original message {message_data['message_id']} acknowledged and removed")
+
+            return success
+
+        except Exception as e:
+            print(f"Failed to send message to dead letter queue: {e}")
+            # In case of DLQ failure, still acknowledge the original message to prevent infinite retry
+            return self.delete_message(message_data['ack_id'])

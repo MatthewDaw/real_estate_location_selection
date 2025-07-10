@@ -776,9 +776,9 @@ class Landwatch(_Scraper):
                     urls_to_update.append(url)
             except Exception as e:
                 print(f"Error processing URL {url}: {e}")
-                raise Exception(f"Error processing URL {url}: {e}")
 
         self._insert_property_batch(batch_entries, urls_to_update)
+        return urls_to_update
 
     def process_tasks(self, max_properties=None, start_offset=0, batch_size=50):
         """

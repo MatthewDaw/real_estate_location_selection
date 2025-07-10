@@ -431,13 +431,12 @@ class Zillow(_Scraper):
         urls_to_update = []
 
         for url in urls:
-            self.num_processed += 1
-
             print(f"extracting zillow url {url} (processed: {self.num_processed}, added: {self.num_added})")
             try:
                 data = self.extract_from_website(url)
                 if data:
                     safe_data = self._prepare_data_for_db(data)
+                    self.num_processed += 1
                     batch_entry = {
                         'source_url': url,
                         'created_at': datetime.utcnow().isoformat(),
@@ -447,13 +446,12 @@ class Zillow(_Scraper):
                     urls_to_update.append(url)
             except Exception as e:
                 print(f"Error processing URL {url}: {e}")
-                raise Exception(f"Error processing URL {url}: {e}")
 
         # Insert the batch
         self.num_added += len(batch_entries)
         self._insert_property_batch(batch_entries, urls_to_update)
-        print(f"uploaded batch of {len(batch_entries)} (total added: {self.num_added})")
         self.total_batches_processed += 1
+        return urls_to_update
 
     def process_tasks(self, max_properties=10000, start_offset=0, batch_size=50):
         """
@@ -536,17 +534,24 @@ class Zillow(_Scraper):
         return prepared_data
 
     def _insert_property_batch(self, entries, urls_to_update):
-        """Insert property batch into BigQuery."""
+        """Insert property batch using streaming inserts to avoid quota limits."""
         table_id = f"{self.project_id}.{self.dataset_id}.zillow_property_details"
 
-        # Insert property details
-        job_config = bigquery.LoadJobConfig(
-            write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-            source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
-        )
+        # Convert entries to proper format if needed
+        rows = []
+        for entry in entries:
+            row = {
+                key: json.dumps(value) if isinstance(value, (list, dict)) else value
+                for key, value in entry.items()
+            }
+            rows.append(row)
 
-        job = self.client.load_table_from_json(entries, table_id, job_config=job_config)
-        job.result()  # Wait for job to complete
+        # Use streaming insert instead of load job
+        errors = self.client.insert_rows_json(table_id, rows)
+
+        if errors:
+            print(f"BigQuery insert errors: {errors}")
+            return False
 
         # Update scraped_at for processed URLs
         if urls_to_update:
@@ -566,6 +571,7 @@ class Zillow(_Scraper):
             query_job.result()
 
         print(f"Inserted batch of {len(entries)} property details and updated scraped_at")
+        return True
 
     def set_property_website(self, gdp):
         """
