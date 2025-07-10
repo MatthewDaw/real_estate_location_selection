@@ -39,6 +39,7 @@ class Zillow(_Scraper):
             bigquery.SchemaField("type", "STRING", mode="REQUIRED"),
             bigquery.SchemaField("scraped_at", "DATE", mode="NULLABLE"),
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("last_pulled", "TIMESTAMP", mode="NULLABLE"),
         ]
 
         try:

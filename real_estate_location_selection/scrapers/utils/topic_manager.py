@@ -103,7 +103,7 @@ class TopicManager:
         table_id = f"{self.project_id}.{self.dataset_id}.job_processing_log"
 
         now = datetime.utcnow()
-        expires_at = now + timedelta(minutes=30)  # Job expires after 30 minutes
+        expires_at = now + timedelta(minutes=90)  # Job expires after 30 minutes
 
         # Clean up any expired processing jobs first
         cleanup_query = f"""
@@ -239,10 +239,10 @@ class TopicManager:
             recently_processed_hashes = {row.job_hash for row in query_job.result()}
 
             # Return URLs whose hashes are NOT in the recently processed set
-            filtered_urls = [
+            filtered_urls = list({
                 url for url, job_hash in url_to_hash.items()
                 if job_hash not in recently_processed_hashes
-            ]
+            })
 
             if len(filtered_urls) < len(urls):
                 print(f"Filtered out {len(urls) - len(filtered_urls)} recently processed URLs")

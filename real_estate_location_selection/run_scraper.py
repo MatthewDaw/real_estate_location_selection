@@ -35,6 +35,7 @@ def pull_from_queue(scraper_source, max_empty_queue_attempts, batch_size, proces
         dead_letter_topic=scrapers_config[scraper_source]['dead_letter_topic'],
         dataset_id=scrapers_config['dataset']
     )
+
     job_loader = DistributedJobLoader(scrapers_config['project_id'], scraper_source,
                                       dataset_id=scrapers_config['dataset'])
     empty_queue_attempts = 0

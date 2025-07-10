@@ -16,7 +16,7 @@ from real_estate_location_selection.scrapers.utils.topic_manager import TopicMan
 class DistributedJobLoader:
     """Enhanced distributed job loader with deduplication awareness"""
 
-    def __init__(self, project_id, scraper, dataset_id="real_estate", jobs_per_batch=5000):
+    def __init__(self, project_id, scraper, dataset_id="real_estate", jobs_per_batch=600):
         self.project_id = project_id
         self.scraper = scraper
         self.dataset_id = dataset_id
@@ -62,7 +62,7 @@ class DistributedJobLoader:
             table = self.client.create_table(table)
             print(f"Created job queue tracking table: {table_id}")
 
-    def acquire_lock(self, lock_name, lock_duration_minutes=10):
+    def acquire_lock(self, lock_name, lock_duration_minutes):
         """
         Try to acquire a distributed lock
 
@@ -316,6 +316,7 @@ class DistributedJobLoader:
             FROM `{source_table}`
             WHERE state IN ('UT', 'ID', 'NV', 'WY', 'MT', 'NH', 'CO', 'AZ', 'NM', 'TX', 'OK', 'KS', 'NE', 'IA', 'IL', 'MO', 'IN', 'AR', 'LA', 'MS', 'MI')
             AND scraped_at IS NULL
+            AND (last_pulled IS NULL OR last_pulled < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
             ORDER BY RAND()
             LIMIT {self.jobs_per_batch}
             """
@@ -326,19 +327,32 @@ class DistributedJobLoader:
             FROM `{source_table}`
             WHERE state IN ('UT', 'ID', 'NV', 'AZ', 'CO', 'WY')
             AND scraped_at IS NULL
+            AND (last_pulled IS NULL OR last_pulled < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 1 DAY))
             ORDER BY RAND()
             LIMIT {self.jobs_per_batch}
             """
 
         try:
             result = self.client.query(urls_query)
-            candidate_urls = [row.url for row in result.result()]
+            candidate_urls = list({row.url for row in result.result()})
 
             if not candidate_urls:
                 print("No candidate URLs found")
                 return False
 
             print(f"Found {len(candidate_urls)} candidate URLs")
+
+            # Update last_pulled timestamp for the selected URLs
+            urls_for_update = "', '".join(candidate_urls)
+            update_query = f"""
+            UPDATE `{source_table}`
+            SET last_pulled = CURRENT_TIMESTAMP()
+            WHERE url IN ('{urls_for_update}')
+            """
+
+            update_result = self.client.query(update_query)
+            update_result.result()  # Wait for the update to complete
+            print(f"Updated last_pulled timestamp for {len(candidate_urls)} URLs")
 
             # Filter out recently processed URLs
             filtered_urls = topic_manager.filter_recently_processed_urls(candidate_urls, self.scraper)
@@ -373,7 +387,7 @@ class DistributedJobLoader:
         lock_name = f"{self.scraper}_job_loader"
 
         # Try to acquire lock
-        if not self.acquire_lock(lock_name, lock_duration_minutes=5):
+        if not self.acquire_lock(lock_name, lock_duration_minutes=10):
             print(f"Another process is already loading {self.scraper} jobs")
             return False
 
