@@ -140,11 +140,15 @@ class DistributedJobLoader:
             return False
 
     def release_lock(self, lock_name):
-        """Release a lock held by this process"""
+        """Release a lock held by this process by setting it to expire in 2 minutes"""
         table_id = f"{self.project_id}.{self.dataset_id}.job_loader_locks"
 
-        delete_query = f"""
-        DELETE FROM `{table_id}`
+        # Set expires_at to 2 minutes from now
+        expires_in_2_minutes = datetime.utcnow() + timedelta(minutes=2)
+
+        update_query = f"""
+        UPDATE `{table_id}`
+        SET expires_at = @expires_at
         WHERE lock_name = @lock_name AND process_id = @process_id
         """
 
@@ -152,11 +156,12 @@ class DistributedJobLoader:
             query_parameters=[
                 bigquery.ScalarQueryParameter("lock_name", "STRING", lock_name),
                 bigquery.ScalarQueryParameter("process_id", "STRING", self.process_id),
+                bigquery.ScalarQueryParameter("expires_at", "TIMESTAMP", expires_in_2_minutes),
             ]
         )
 
-        self.client.query(delete_query, job_config=job_config).result()
-        print(f"Lock '{lock_name}' released by process {self.process_id}")
+        self.client.query(update_query, job_config=job_config).result()
+        print(f"Lock '{lock_name}' set to expire in 2 minutes by process {self.process_id}")
 
     def get_unqueued_jobs_count(self):
         """
