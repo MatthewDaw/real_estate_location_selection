@@ -103,7 +103,7 @@ class TopicManager:
         table_id = f"{self.project_id}.{self.dataset_id}.job_processing_log"
 
         now = datetime.utcnow()
-        expires_at = now + timedelta(minutes=90)  # Job expires after 30 minutes
+        expires_at = now + timedelta(minutes=90)  # Job expires after 90 minutes
 
         # Clean up any expired processing jobs first
         cleanup_query = f"""
@@ -116,10 +116,11 @@ class TopicManager:
         except Exception as e:
             print(f"Warning: Could not clean up expired jobs: {e}")
 
-        # Try to insert the processing record
+        # Try to insert the processing record with proper FROM clause
         insert_query = f"""
         INSERT INTO `{table_id}` (job_hash, url, scraper_source, status, process_id, started_at, expires_at, retry_count)
         SELECT @job_hash, @url, @scraper_source, 'processing', @process_id, @started_at, @expires_at, 0
+        FROM (SELECT 1) AS dummy
         WHERE NOT EXISTS (
             SELECT 1 FROM `{table_id}` 
             WHERE job_hash = @job_hash 

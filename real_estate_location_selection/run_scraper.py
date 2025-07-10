@@ -75,7 +75,7 @@ def pull_from_queue(scraper_source, max_empty_queue_attempts, batch_size, proces
                     time.sleep(wait_time)
 
 
-def run_scraper(scraper_source, max_empty_queue_attempts=5, batch_size=30):
+def run_scraper(scraper_source, max_empty_queue_attempts=5, batch_size=3):
     """
     Enhanced scraper runner with job deduplication and proper tracking
 
