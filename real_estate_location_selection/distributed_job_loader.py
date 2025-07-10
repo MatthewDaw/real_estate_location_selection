@@ -345,8 +345,15 @@ class DistributedJobLoader:
 
             print(f"Found {len(candidate_urls)} candidate URLs")
 
+            # Filter out recently processed URLs
+            filtered_urls = topic_manager.filter_recently_processed_urls(candidate_urls, self.scraper)
+
+            if not filtered_urls:
+                print("All candidate URLs were recently processed")
+                return False
+
             # Update last_pulled timestamp for the selected URLs
-            urls_for_update = "', '".join(candidate_urls)
+            urls_for_update = "', '".join(filtered_urls)
             update_query = f"""
             UPDATE `{source_table}`
             SET last_pulled = CURRENT_TIMESTAMP()
@@ -355,14 +362,8 @@ class DistributedJobLoader:
 
             update_result = self.client.query(update_query)
             update_result.result()  # Wait for the update to complete
-            print(f"Updated last_pulled timestamp for {len(candidate_urls)} URLs")
+            print(f"Updated last_pulled timestamp for {len(filtered_urls)} URLs")
 
-            # Filter out recently processed URLs
-            filtered_urls = topic_manager.filter_recently_processed_urls(candidate_urls, self.scraper)
-
-            if not filtered_urls:
-                print("All candidate URLs were recently processed")
-                return False
 
             print(f"After filtering: {len(filtered_urls)} URLs ready to queue")
 
