@@ -40,6 +40,7 @@ class Zillow(_Scraper):
             bigquery.SchemaField("scraped_at", "DATE", mode="NULLABLE"),
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
             bigquery.SchemaField("last_pulled", "TIMESTAMP", mode="NULLABLE"),
+            bigquery.SchemaField("processing_id", "STRING", mode="NULLABLE"),
         ]
 
         try:
@@ -426,15 +427,16 @@ class Zillow(_Scraper):
     def process_urls(self, urls):
         if not urls:
             print("No more URLs to scrape")
-            return
+            return []
 
         batch_entries = []
-        urls_to_update = []
+        successfully_collected_urls = []
 
         for url in urls:
             print(f"extracting zillow url {url} (processed: {self.num_processed}, added: {self.num_added})")
             try:
                 data = self.extract_from_website(url)
+
                 if data:
                     safe_data = self._prepare_data_for_db(data)
                     self.num_processed += 1
@@ -443,16 +445,16 @@ class Zillow(_Scraper):
                         'created_at': datetime.utcnow().isoformat(),
                         **safe_data
                     }
+                    successfully_collected_urls.append(url)
                     batch_entries.append(batch_entry)
-                    urls_to_update.append(url)
             except Exception as e:
                 print(f"Error processing URL {url}: {e}")
 
         # Insert the batch
         self.num_added += len(batch_entries)
-        self._insert_property_batch(batch_entries, urls_to_update)
+        self._insert_property_batch(batch_entries, urls)
         self.total_batches_processed += 1
-        return urls_to_update
+        return successfully_collected_urls
 
     def process_tasks(self, max_properties=10000, start_offset=0, batch_size=50):
         """
@@ -467,7 +469,6 @@ class Zillow(_Scraper):
                 # Get URLs to process
                 urls = self._fetch_urls_to_scrape(limit=batch_size, offset=self.num_processed)
                 self.process_urls([el.url for el in urls])
-
         except Exception as e:
             print(f"Error during processing: {e}")
             print(f"Resume with: process_tasks(start_offset={self.num_processed})")
@@ -558,7 +559,7 @@ class Zillow(_Scraper):
         if urls_to_update:
             update_query = f"""
             UPDATE `{self.project_id}.{self.dataset_id}.zillow_urls`
-            SET scraped_at = CURRENT_DATE()
+            SET scraped_at = CURRENT_DATE(), processing_id = NULL
             WHERE url IN UNNEST(@urls)
             """
 

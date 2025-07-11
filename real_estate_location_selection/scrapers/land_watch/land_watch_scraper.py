@@ -61,6 +61,7 @@ class Landwatch(_Scraper):
             bigquery.SchemaField("scraped_at", "DATE", mode="NULLABLE"),
             bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
             bigquery.SchemaField("last_pulled", "TIMESTAMP", mode="NULLABLE"),
+            bigquery.SchemaField("processing_id", "STRING", mode="NULLABLE"),
         ]
 
         try:
@@ -468,6 +469,8 @@ class Landwatch(_Scraper):
 
         raw = m.group(1).encode("utf-8").decode("unicode_escape")
         state = json.loads(raw)
+        if "propertyDetailPage" not in state:
+            return {}
         prop_data = state["propertyDetailPage"]["propertyData"]
 
         # Coordinates
@@ -741,7 +744,7 @@ class Landwatch(_Scraper):
         if urls_to_update:
             update_query = f"""
             UPDATE `{self.project_id}.{self.dataset_id}.landwatch_urls`
-            SET scraped_at = CURRENT_DATE()
+            SET scraped_at = CURRENT_DATE(), processing_id = NULL
             WHERE url IN UNNEST(@urls)
             """
 
@@ -757,15 +760,17 @@ class Landwatch(_Scraper):
         print(f"Inserted batch of {len(entries)} property details and updated scraped_at")
 
     def process_urls(self, urls):
+        if not urls:
+            print("No more URLs to scrape")
+            return []
         batch_entries = []
-        urls_to_update = []
-
+        successfully_collected_urls = []
         for url in urls:
             self.num_processed += 1
-
             print(f"extracting landwatch url {url} (processed: {self.num_processed}, added: {self.num_added})")
             try:
                 data = self.extract_from_website(url)
+                successfully_collected_urls.append(url)
                 if data:
                     safe_data = self._prepare_data_for_db(data)
                     batch_entry = {
@@ -774,12 +779,13 @@ class Landwatch(_Scraper):
                         **safe_data
                     }
                     batch_entries.append(batch_entry)
-                    urls_to_update.append(url)
+
             except Exception as e:
                 print(f"Error processing URL {url}: {e}")
+                self.extract_from_website(url)
 
-        self._insert_property_batch(batch_entries, urls_to_update)
-        return urls_to_update
+        self._insert_property_batch(batch_entries, urls)
+        return successfully_collected_urls
 
     def process_tasks(self, max_properties=None, start_offset=0, batch_size=50):
         """
