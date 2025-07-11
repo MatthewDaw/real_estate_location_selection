@@ -101,7 +101,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
 
 
 
-def run_scraper(scraper_source, batch_size=3):
+def run_scraper(scraper_source, batch_size):
     """
     Enhanced scraper runner with job deduplication and proper tracking
 

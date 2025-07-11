@@ -289,6 +289,21 @@ wheels = [
 ]
 
 [[package]]
+name = "google-cloud-compute"
+version = "1.32.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/30/99/4c465fc9e46161ff4dfbac0d9efc64f4b91cf255f82a5052241d032cd6ba/google_cloud_compute-1.32.0.tar.gz", hash = "sha256:76d775da26aefbf05eb6b95703f6015e0698e63c97219bbe74ffd34012b01386", size = 4421136, upload-time = "2025-07-10T18:51:35.538Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/76/ef/1639de93e65e462f5edd585a130d45c094c32c387c59dd9cad8a588de6e4/google_cloud_compute-1.32.0-py3-none-any.whl", hash = "sha256:3635558c5194be9d801bfed61055c3b57e872fb19733864dabb0082d396ba15e", size = 3410494, upload-time = "2025-07-10T18:51:17.028Z" },
+]
+
+[[package]]
 name = "google-cloud-core"
 version = "2.4.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1164,6 +1179,7 @@ dependencies = [
     { name = "google-cloud-batch" },
     { name = "google-cloud-bigquery" },
     { name = "google-cloud-bigquery-storage" },
+    { name = "google-cloud-compute" },
     { name = "google-cloud-pubsub" },
     { name = "google-cloud-secret-manager" },
     { name = "google-cloud-storage" },
@@ -1189,6 +1205,7 @@ requires-dist = [
     { name = "google-cloud-batch", specifier = "==0.17.26" },
     { name = "google-cloud-bigquery", specifier = "==3.25.0" },
     { name = "google-cloud-bigquery-storage", specifier = "==2.25.0" },
+    { name = "google-cloud-compute", specifier = ">=1.32.0" },
     { name = "google-cloud-pubsub", specifier = "==2.29.0" },
     { name = "google-cloud-secret-manager", specifier = "==2.23.3" },
     { name = "google-cloud-storage", specifier = "==3.1.0" },

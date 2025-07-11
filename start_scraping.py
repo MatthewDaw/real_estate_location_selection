@@ -8,11 +8,13 @@ from google.cloud import batch_v1, compute_v1
 from google.protobuf import duration_pb2
 
 
-class MultiRegionBatchDispatcher:
-    def __init__(self, project_id: str, task_count: int, provisioning_model: str = "SPOT"):
+class UnifiedScraperDispatcher:
+    def __init__(self, project_id: str, task_count: int, provisioning_model: str = "SPOT",
+                 max_tasks_per_region: int = 8):
         self.project_id = project_id
         self.task_count = task_count
         self.provisioning_model = provisioning_model
+        self.max_tasks_per_region = max_tasks_per_region
         self.batch_client = batch_v1.BatchServiceClient()
         self.compute_client = compute_v1.RegionsClient()
 
@@ -24,6 +26,18 @@ class MultiRegionBatchDispatcher:
             'us-central1': 'projects/flowing-flame-464314-j5/regions/us-central1/subnetworks/default-subnet',
             'us-east1': 'projects/flowing-flame-464314-j5/regions/us-east1/subnetworks/default-subnet',
             'us-east4': 'projects/flowing-flame-464314-j5/regions/us-east4/subnetworks/default-subnet',
+        }
+
+        # Job configurations
+        self.job_configs = {
+            'landwatch': {
+                'job_prefix': 'land-watch-collection',
+                'script_path': 'real_estate_location_selection/scrapers/land_watch/run_land_watch_scraper.py'
+            },
+            'zillow': {
+                'job_prefix': 'zillow-collection',
+                'script_path': 'real_estate_location_selection/scrapers/zillow/run_zillow_scraper.py'
+            }
         }
 
     def get_region_quota(self, region: str) -> int:
@@ -45,23 +59,25 @@ class MultiRegionBatchDispatcher:
             return 0
 
     def distribute_tasks(self) -> List[Tuple[str, int]]:
-        """Distribute tasks across regions based on available quota"""
+        """Distribute tasks across regions based on available quota and max_tasks_per_region limit"""
         region_quotas = {}
         total_available = 0
 
         print("Checking quotas across regions...")
         for region in self.regions.keys():
             quota = self.get_region_quota(region)
-            region_quotas[region] = quota
-            total_available += quota
-            print(f"Region {region}: {quota} available addresses")
+            # Cap quota at max_tasks_per_region to ensure we don't exceed the limit
+            effective_quota = min(quota, self.max_tasks_per_region)
+            region_quotas[region] = effective_quota
+            total_available += effective_quota
+            print(f"Region {region}: {quota} available addresses (capped at {effective_quota})")
 
         if total_available < self.task_count:
             print(
-                f"Warning: Only {total_available} addresses available across all regions, but {self.task_count} tasks requested")
-            print("Consider requesting quota increases or reducing task count")
+                f"Warning: Only {total_available} addresses available across all regions (with {self.max_tasks_per_region} max per region), but {self.task_count} tasks requested")
+            print("Consider requesting quota increases, reducing task count, or increasing max_tasks_per_region")
 
-        # Distribute tasks proportionally, but cap at available quota
+        # Distribute tasks proportionally, but cap at available quota and max_tasks_per_region
         distributions = []
         remaining_tasks = self.task_count
 
@@ -72,8 +88,8 @@ class MultiRegionBatchDispatcher:
             if remaining_tasks <= 0 or available_quota <= 0:
                 continue
 
-            # Take the minimum of remaining tasks and available quota
-            tasks_for_region = min(remaining_tasks, available_quota)
+            # Take the minimum of remaining tasks, available quota, and max_tasks_per_region
+            tasks_for_region = min(remaining_tasks, available_quota, self.max_tasks_per_region)
 
             if tasks_for_region > 0:
                 distributions.append((region, tasks_for_region))
@@ -81,16 +97,48 @@ class MultiRegionBatchDispatcher:
                 print(f"Assigning {tasks_for_region} tasks to {region}")
 
         if remaining_tasks > 0:
-            print(f"Warning: Could not assign {remaining_tasks} tasks due to quota limitations")
+            print(f"Warning: Could not assign {remaining_tasks} tasks due to quota/region limitations")
 
         return distributions
 
-    def create_job_for_region(self, region: str, task_count: int) -> str:
-        """Create a batch job for a specific region"""
-        parent = f"projects/{self.project_id}/locations/{region}"
-        job_id = f"land-watch-collection-{region}-{int(time.time())}"
+    def distribute_tasks_evenly(self) -> List[Tuple[str, int]]:
+        """Distribute tasks evenly across regions (fallback method without quota checking)"""
+        regions_list = list(self.regions.keys())
+        num_regions = len(regions_list)
 
-        # Get the appropriate subnetwork for this region
+        # Calculate base tasks per region and remainder
+        base_tasks_per_region = self.task_count // num_regions
+        remainder = self.task_count % num_regions
+
+        distributions = []
+
+        print(
+            f"Distributing {self.task_count} tasks evenly across {num_regions} regions (max {self.max_tasks_per_region} per region)...")
+
+        for i, region in enumerate(regions_list):
+            # Distribute remainder among first few regions
+            tasks_for_region = base_tasks_per_region + (1 if i < remainder else 0)
+
+            # Cap at max_tasks_per_region
+            tasks_for_region = min(tasks_for_region, self.max_tasks_per_region)
+
+            if tasks_for_region > 0:
+                distributions.append((region, tasks_for_region))
+                print(f"Assigning {tasks_for_region} tasks to {region}")
+
+        # Check if we couldn't assign all tasks due to max_tasks_per_region limit
+        total_assigned = sum(tasks for _, tasks in distributions)
+        if total_assigned < self.task_count:
+            print(
+                f"Warning: Could only assign {total_assigned} of {self.task_count} tasks due to max_tasks_per_region limit of {self.max_tasks_per_region}")
+
+        return distributions
+
+    def create_job(self, region: str, task_count: int, job_type: str) -> str:
+        """Create a batch job for a specific region and job type"""
+        config = self.job_configs[job_type]
+        parent = f"projects/{self.project_id}/locations/{region}"
+        job_id = f"{config['job_prefix']}-{region}-{int(time.time())}"
         subnetwork = self.regions[region]
 
         request = batch_v1.CreateJobRequest(
@@ -116,7 +164,7 @@ class MultiRegionBatchDispatcher:
                                         entrypoint="sh",
                                         commands=[
                                             "-c",
-                                            "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && exec uv run real_estate_location_selection/scrapers/land_watch/run_land_watch_scraper.py"
+                                            f"Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && exec uv run {config['script_path']}"
                                         ]
                                     ),
                                     environment=batch_v1.Environment(
@@ -129,7 +177,8 @@ class MultiRegionBatchDispatcher:
                                             "EVOMI_PASSWORD": os.getenv("EVOMI_PASSWORD"),
                                             "INSTANCE_CONNECTION_NAME": "flowing-flame-464314-j5:us-central1:matt-sandbox",
                                             "BATCH_REGION": region,  # Add region info for debugging
-                                            "BATCH_TASK_COUNT": str(task_count)
+                                            "BATCH_TASK_COUNT": str(task_count),
+                                            "JOB_TYPE": job_type  # Add job type for debugging
                                         }
                                     ),
                                 )
@@ -146,15 +195,6 @@ class MultiRegionBatchDispatcher:
                             )
                         )
                     ],
-                    network=batch_v1.AllocationPolicy.NetworkPolicy(
-                        network_interfaces=[
-                            batch_v1.AllocationPolicy.NetworkInterface(
-                                network="projects/flowing-flame-464314-j5/global/networks/matt-default",
-                                subnetwork=subnetwork,
-                                no_external_ip_address=False
-                            )
-                        ]
-                    ),
                 ),
                 logs_policy=batch_v1.LogsPolicy(destination="CLOUD_LOGGING"),
             ),
@@ -162,18 +202,25 @@ class MultiRegionBatchDispatcher:
 
         try:
             response = self.batch_client.create_job(request=request)
-            print(f"Created job {job_id} in {region} with {task_count} tasks")
+            print(f"Created {job_type} job {job_id} in {region} with {task_count} tasks")
             return job_id
         except Exception as e:
-            print(f"Failed to create job in {region}: {e}")
+            print(f"Failed to create {job_type} job in {region}: {e}")
             return None
 
-    def deploy_jobs(self) -> List[str]:
-        """Deploy jobs across multiple regions"""
-        distributions = self.distribute_tasks()
+    def deploy_jobs(self, job_type: str, use_quota_checking: bool = True) -> List[str]:
+        """Deploy jobs across multiple regions for a specific job type"""
+        if use_quota_checking:
+            try:
+                distributions = self.distribute_tasks()
+            except Exception as e:
+                print(f"Quota checking failed: {e}. Falling back to even distribution.")
+                distributions = self.distribute_tasks_evenly()
+        else:
+            distributions = self.distribute_tasks_evenly()
 
         if not distributions:
-            print("No tasks could be distributed due to quota limitations")
+            print(f"No {job_type} tasks could be distributed")
             return []
 
         job_ids = []
@@ -181,7 +228,7 @@ class MultiRegionBatchDispatcher:
         # Deploy jobs in parallel across regions
         with ThreadPoolExecutor(max_workers=len(distributions)) as executor:
             future_to_region = {
-                executor.submit(self.create_job_for_region, region, task_count): region
+                executor.submit(self.create_job, region, task_count, job_type): region
                 for region, task_count in distributions
             }
 
@@ -192,28 +239,59 @@ class MultiRegionBatchDispatcher:
                     if job_id:
                         job_ids.append(job_id)
                 except Exception as e:
-                    print(f"Job creation failed for region {region}: {e}")
+                    print(f"{job_type} job creation failed for region {region}: {e}")
 
         print(
-            f"\nSuccessfully created {len(job_ids)} jobs across {len(set(dist[0] for dist in distributions))} regions")
-        print("Job IDs:", job_ids)
+            f"\nSuccessfully created {len(job_ids)} {job_type} jobs across {len(set(dist[0] for dist in distributions))} regions")
+        print(f"{job_type} Job IDs:", job_ids)
 
         return job_ids
+
+    def deploy_landwatch_jobs(self, use_quota_checking: bool = True) -> List[str]:
+        """Deploy LandWatch jobs across multiple regions"""
+        return self.deploy_jobs('landwatch', use_quota_checking)
+
+    def deploy_zillow_jobs(self, use_quota_checking: bool = True) -> List[str]:
+        """Deploy Zillow jobs across multiple regions"""
+        return self.deploy_jobs('zillow', use_quota_checking)
 
 
 def main():
     # Configuration
     PROJECT_ID = "flowing-flame-464314-j5"
-    TASK_COUNT = 24  # This is now a free variable - will be distributed as quota allows
+    LANDWATCH_TASK_COUNT = 24  # Number of LandWatch tasks to distribute
+    ZILLOW_TASK_COUNT = 32  # Number of Zillow tasks to distribute
     PROVISIONING_MODEL = "SPOT"  # Options: "STANDARD" or "SPOT"
+    MAX_TASKS_PER_REGION = 8  # Maximum tasks per region to ensure we stay within quota
+    USE_QUOTA_CHECKING = True  # Set to False if you don't have google-cloud-compute installed
 
-    dispatcher = MultiRegionBatchDispatcher(PROJECT_ID, TASK_COUNT, PROVISIONING_MODEL)
-    job_ids = dispatcher.deploy_jobs()
+    print("=== Deploying LandWatch Jobs ===")
+    landwatch_dispatcher = UnifiedScraperDispatcher(
+        PROJECT_ID,
+        LANDWATCH_TASK_COUNT,
+        PROVISIONING_MODEL,
+        MAX_TASKS_PER_REGION
+    )
+    landwatch_job_ids = landwatch_dispatcher.deploy_landwatch_jobs(USE_QUOTA_CHECKING)
 
-    if job_ids:
-        print(f"\nDeployment complete! {len(job_ids)} jobs created.")
-        print("Monitor jobs with:")
-        for job_id in job_ids:
+    print("\n=== Deploying Zillow Jobs ===")
+    zillow_dispatcher = UnifiedScraperDispatcher(
+        PROJECT_ID,
+        ZILLOW_TASK_COUNT,
+        PROVISIONING_MODEL,
+        MAX_TASKS_PER_REGION
+    )
+    zillow_job_ids = zillow_dispatcher.deploy_zillow_jobs(USE_QUOTA_CHECKING)
+
+    # Summary
+    print(f"\n=== Deployment Summary ===")
+    print(f"LandWatch jobs created: {len(landwatch_job_ids)}")
+    print(f"Zillow jobs created: {len(zillow_job_ids)}")
+    print(f"Total jobs created: {len(landwatch_job_ids) + len(zillow_job_ids)}")
+
+    if landwatch_job_ids or zillow_job_ids:
+        print("\nMonitor jobs with:")
+        for job_id in landwatch_job_ids + zillow_job_ids:
             print(f"  gcloud batch jobs describe {job_id}")
     else:
         print("No jobs were created. Check quotas and try again.")
