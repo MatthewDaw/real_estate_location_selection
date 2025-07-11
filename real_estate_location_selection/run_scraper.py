@@ -126,14 +126,11 @@ def run_scraper(scraper_source, batch_size=3):
             print(f"Processing batch of {len(urls)} URLs")
             processed_count += len(urls)
             # Process URLs and get list of successfully processed ones
-            try:
-                successfully_scraped_urls = scraper.process_urls(urls)
-                for url in urls:
-                    if url in successfully_scraped_urls:
-                        success_count += 1
-                    else:
-                        error_count += 1
-                        print(f"Failed to acknowledge successful processing of {url}")
-                print(f"Batch complete. Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
-            except Exception as e:
-                print(f"Error processing batch: {e}")
+            successfully_scraped_urls = scraper.process_urls(urls)
+            for url in urls:
+                if url in successfully_scraped_urls:
+                    success_count += 1
+                else:
+                    error_count += 1
+                    print(f"Failed to acknowledge successful processing of {url}")
+            print(f"Batch complete. Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
