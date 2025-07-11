@@ -7,7 +7,7 @@ import sys
 import time
 from datetime import datetime
 from tabulate import tabulate
-from scrapers.utils.big_query_wrapper import create_client
+from real_estate_location_selection.scrapers.utils.big_query_wrapper import create_client
 
 
 class ScrapingMonitor:

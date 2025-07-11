@@ -7,7 +7,7 @@ from google.cloud import bigquery
 from datetime import datetime
 from typing import List
 
-from scrapers.utils.big_query_wrapper import create_client
+from real_estate_location_selection.scrapers.utils.big_query_wrapper import create_client
 
 scrapers_config = {
     "dataset": "real_estate",

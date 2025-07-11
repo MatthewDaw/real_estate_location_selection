@@ -14,7 +14,8 @@ from google.cloud import bigquery, pubsub_v1
 from playwright.sync_api import Browser, BrowserContext, Page, Request, Route
 
 from real_estate_location_selection.scrapers.utils.session import Session
-from scrapers.utils.big_query_wrapper import create_client
+from real_estate_location_selection.scrapers.utils.big_query_wrapper import create_client
+
 class Task(TypedDict):
     source: str
     sitemap_updated_at: Union[str, None]
