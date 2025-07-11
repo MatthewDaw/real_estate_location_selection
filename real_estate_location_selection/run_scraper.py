@@ -115,7 +115,7 @@ def run_scraper(scraper_source, batch_size=3):
     print(f"Starting scraper with process ID: {process_id}")
 
     browser = get_browser()
-    scraper = scrapers_config[scraper_source]["scraper"](browser)
+    scraper = scrapers_config[scraper_source]["scraper"](browser, scrapers_config[scraper_source]["states"])
 
     processed_count = 0
     success_count = 0

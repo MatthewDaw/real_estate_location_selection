@@ -19,32 +19,10 @@ class Landwatch(_Scraper):
     source = "landwatch"
     use_proxies_camoufox = False
     use_resource_intercept = False
-    states_to_scrape = [
-        'UT',
-        'ID',
-        'NV',
-        'WY',
-        'MT',
-        'NH',
-        'CO',
-        'AZ',
-        'NM',
-        'TX',
-        'OK',
-        'KS',
-        'NE',
-        'IA',
-        'IL',
-        'MO',
-        'IN',
-        'AR',
-        'LA',
-        'MS',
-        'MI',
-    ]
 
-    def __init__(self, browser):
+    def __init__(self, browser, states_to_scrape):
         super().__init__(browser, "landwatch-job-queue")
+        self.states_to_scrape = states_to_scrape
         self._ensure_tables_exist()
         self.num_processed = 0
         self.total_batches_processed = 0

@@ -11,17 +11,10 @@ class Zillow(_Scraper):
     source = "zillow"
     use_proxies_camoufox = True
     use_resource_intercept = False
-    states_to_scrape = [
-        'UT',
-        'ID',
-        'NV',
-        'AZ',
-        'CO',
-        'WY'
-    ]
 
-    def __init__(self, browser):
+    def __init__(self, browser, states_to_scrape):
         super().__init__(browser, "zillow-job-queue")
+        self.states_to_scrape = states_to_scrape
         self._ensure_tables_exist()
         self.num_processed = 0
         self.num_added = 0
