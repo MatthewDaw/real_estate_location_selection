@@ -1,0 +1,205 @@
+-- deduplicat landwatch_properties
+DELETE FROM `flowing-flame-464314-j5.real_estate.landwatch_properties`
+WHERE created_at < (
+    SELECT MAX(created_at)
+    FROM `flowing-flame-464314-j5.real_estate.landwatch_properties` as p2
+    WHERE p2.url = `flowing-flame-464314-j5.real_estate.landwatch_properties`.url
+);
+
+-- deduplicat landwatch_urls
+DELETE FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+WHERE created_at < (
+    SELECT MAX(created_at)
+    FROM `flowing-flame-464314-j5.real_estate.landwatch_urls` as p2
+    WHERE p2.url = `flowing-flame-464314-j5.real_estate.landwatch_urls`.url
+);
+
+-- deduplicat zillow_property_details
+DELETE FROM `flowing-flame-464314-j5.real_estate.zillow_property_details`
+WHERE created_at < (
+    SELECT MAX(created_at)
+    FROM `flowing-flame-464314-j5.real_estate.zillow_property_details` as p2
+    WHERE p2.source_url = `flowing-flame-464314-j5.real_estate.zillow_property_details`.source_url
+);
+
+-- deduplicat zillow_urls
+DELETE FROM `flowing-flame-464314-j5.real_estate.zillow_urls`
+WHERE created_at < (
+    SELECT MAX(created_at)
+    FROM `flowing-flame-464314-j5.real_estate.zillow_urls` as p2
+    WHERE p2.url = `flowing-flame-464314-j5.real_estate.zillow_urls`.url
+);
+
+-- mark scraped landwatch urls as scraped
+UPDATE `flowing-flame-464314-j5.real_estate.landwatch_urls` AS urls
+SET scraped_at = DATE(props.created_at)
+FROM `flowing-flame-464314-j5.real_estate.landwatch_properties` AS props
+WHERE urls.url = props.url
+  AND urls.scraped_at IS NULL;
+
+
+-- mark scraped zillow urls as scraped
+UPDATE `flowing-flame-464314-j5.real_estate.zillow_urls` AS urls
+SET scraped_at = DATE(props.created_at)
+FROM `flowing-flame-464314-j5.real_estate.zillow_property_details` AS props
+WHERE urls.url = props.source_url
+  AND urls.scraped_at IS NULL;
+
+-- set landwatch urls never scraped as not scraped
+UPDATE `flowing-flame-464314-j5.real_estate.landwatch_urls`
+SET scraped_at = NULL
+WHERE url NOT IN (
+    SELECT url
+    FROM `flowing-flame-464314-j5.real_estate.landwatch_properties`
+    WHERE url IS NOT NULL
+);
+
+-- set zillow urls never scraped as not scraped
+UPDATE `flowing-flame-464314-j5.real_estate.zillow_urls`
+SET scraped_at = NULL
+WHERE url NOT IN (
+    SELECT source_url as url
+    FROM `flowing-flame-464314-j5.real_estate.zillow_property_details`
+    WHERE url IS NOT NULL
+);
+
+
+
+
+-- 1. Check that tables still have data (not fully truncated)
+SELECT
+  'landwatch_properties' as table_name,
+  COUNT(*) as total_rows
+FROM `flowing-flame-464314-j5.real_estate.landwatch_properties`
+
+UNION ALL
+
+SELECT
+  'landwatch_urls' as table_name,
+  COUNT(*) as total_rows
+FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+
+UNION ALL
+
+SELECT
+  'zillow_property_details' as table_name,
+  COUNT(*) as total_rows
+FROM `flowing-flame-464314-j5.real_estate.zillow_property_details`
+
+UNION ALL
+
+SELECT
+  'zillow_urls' as table_name,
+  COUNT(*) as total_rows
+FROM `flowing-flame-464314-j5.real_estate.zillow_urls`;
+
+-- 2. Check that deduplication worked - should show 0 duplicates
+SELECT
+  'landwatch_properties' as table_name,
+  COUNT(*) as duplicate_count
+FROM (
+  SELECT url
+  FROM `flowing-flame-464314-j5.real_estate.landwatch_properties`
+  GROUP BY url
+  HAVING COUNT(*) > 1
+)
+
+UNION ALL
+
+SELECT
+  'landwatch_urls' as table_name,
+  COUNT(*) as duplicate_count
+FROM (
+  SELECT url
+  FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+  GROUP BY url
+  HAVING COUNT(*) > 1
+)
+
+UNION ALL
+
+SELECT
+  'zillow_property_details' as table_name,
+  COUNT(*) as duplicate_count
+FROM (
+  SELECT source_url
+  FROM `flowing-flame-464314-j5.real_estate.zillow_property_details`
+  GROUP BY source_url
+  HAVING COUNT(*) > 1
+)
+
+UNION ALL
+
+SELECT
+  'zillow_urls' as table_name,
+  COUNT(*) as duplicate_count
+FROM (
+  SELECT url
+  FROM `flowing-flame-464314-j5.real_estate.zillow_urls`
+  GROUP BY url
+  HAVING COUNT(*) > 1
+);
+
+-- 3. Check scraped_at updates worked correctly
+SELECT
+  'landwatch_urls' as table_name,
+  COUNT(CASE WHEN scraped_at IS NOT NULL THEN 1 END) as scraped_count,
+  COUNT(CASE WHEN scraped_at IS NULL THEN 1 END) as not_scraped_count,
+  COUNT(*) as total_count
+FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+
+UNION ALL
+
+SELECT
+  'zillow_urls' as table_name,
+  COUNT(CASE WHEN scraped_at IS NOT NULL THEN 1 END) as scraped_count,
+  COUNT(CASE WHEN scraped_at IS NULL THEN 1 END) as not_scraped_count,
+  COUNT(*) as total_count
+FROM `flowing-flame-464314-j5.real_estate.zillow_urls`;
+
+-- 4. Verify scraped URLs exist in property tables
+SELECT
+  'landwatch mismatch' as check_type,
+  COUNT(*) as mismatch_count
+FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+WHERE scraped_at IS NOT NULL
+  AND url NOT IN (
+    SELECT url
+    FROM `flowing-flame-464314-j5.real_estate.landwatch_properties`
+    WHERE url IS NOT NULL
+  )
+
+UNION ALL
+
+SELECT
+  'zillow mismatch' as check_type,
+  COUNT(*) as mismatch_count
+FROM `flowing-flame-464314-j5.real_estate.zillow_urls`
+WHERE scraped_at IS NOT NULL
+  AND url NOT IN (
+    SELECT source_url
+    FROM `flowing-flame-464314-j5.real_estate.zillow_property_details`
+    WHERE source_url IS NOT NULL
+  );
+
+-- 5. Check sample data to spot-check results
+SELECT
+  'landwatch_urls sample' as table_name,
+  url,
+  scraped_at,
+  created_at
+FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+ORDER BY created_at DESC
+LIMIT 5;
+
+SELECT
+  'zillow_urls sample' as table_name,
+  url,
+  scraped_at,
+  created_at
+FROM `flowing-flame-464314-j5.real_estate.zillow_urls`
+ORDER BY created_at DESC
+LIMIT 5;
+
+
+
