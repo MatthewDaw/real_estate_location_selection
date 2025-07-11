@@ -121,30 +121,19 @@ def run_scraper(scraper_source, batch_size=3):
     success_count = 0
     error_count = 0
 
-    try:
-        for urls in pull_from_queue(scraper_source, batch_size, process_id):
-            if urls:
-                print(f"Processing batch of {len(urls)} URLs")
-                processed_count += len(urls)
-                # Process URLs and get list of successfully processed ones
-                try:
-                    successfully_scraped_urls = scraper.process_urls(urls)
-                    for url in urls:
-                        if url in successfully_scraped_urls:
-                            success_count += 1
-                        else:
-                            error_count += 1
-                            print(f"Failed to acknowledge successful processing of {url}")
-                    print(f"Batch complete. Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
-                except Exception as e:
-                    print(f"Error processing batch: {e}")
-
-    except KeyboardInterrupt:
-        print(
-            f"\nScraper interrupted. Final stats - Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
-    except Exception as e:
-        print(f"Scraper error: {e}")
-    finally:
-        # Clean up
-        browser.close()
-        print(f"This session - Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
+    for urls in pull_from_queue(scraper_source, batch_size, process_id):
+        if urls:
+            print(f"Processing batch of {len(urls)} URLs")
+            processed_count += len(urls)
+            # Process URLs and get list of successfully processed ones
+            try:
+                successfully_scraped_urls = scraper.process_urls(urls)
+                for url in urls:
+                    if url in successfully_scraped_urls:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        print(f"Failed to acknowledge successful processing of {url}")
+                print(f"Batch complete. Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
+            except Exception as e:
+                print(f"Error processing batch: {e}")
