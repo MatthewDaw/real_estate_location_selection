@@ -782,7 +782,6 @@ class Landwatch(_Scraper):
 
             except Exception as e:
                 print(f"Error processing URL {url}: {e}")
-                self.extract_from_website(url)
 
         self._insert_property_batch(batch_entries, urls)
         return successfully_collected_urls
