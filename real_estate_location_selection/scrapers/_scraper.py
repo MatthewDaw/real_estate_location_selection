@@ -14,7 +14,7 @@ from google.cloud import bigquery, pubsub_v1
 from playwright.sync_api import Browser, BrowserContext, Page, Request, Route
 
 from real_estate_location_selection.scrapers.utils.session import Session
-
+from scrapers.utils.big_query_wrapper import create_client
 class Task(TypedDict):
     source: str
     sitemap_updated_at: Union[str, None]
@@ -40,7 +40,6 @@ class _Scraper:
         if self.source is None:
             raise Exception("Assign a source name")
         self.session = Session()
-        self.bigquery_client = bigquery.Client()
         self.pubsub_client = pubsub_v1.PublisherClient()
         self.topic_path = self.pubsub_client.topic_path(
             "flowing-flame-464314-j5", topic_id
@@ -53,7 +52,7 @@ class _Scraper:
         dataset_id = 'real_estate'
         self.project_id = project_id
         self.dataset_id = dataset_id
-        self.client = bigquery.Client(project=project_id)
+        self.client = create_client(project=project_id)
         self.dataset_ref = self.client.get_dataset(dataset_id)
 
     @property
@@ -81,7 +80,7 @@ class _Scraper:
             WHERE created_on > "2023-01-01"
                 AND source = '{self.source}';
         """
-        table = self.bigquery_client.query(query).result().to_arrow()
+        table = self.client.query(query).result().to_arrow()
         for batch in table.to_batches():
             for row in batch.to_pylist():
                 previous_sitemap.add((row["loc"], row["sitemap_updated_at"]))
@@ -100,7 +99,7 @@ class _Scraper:
             ORDER BY RAND()
         """
         valid_tasks: list[Task] = []
-        table = self.bigquery_client.query(query).result().to_arrow()
+        table = self.client.query(query).result().to_arrow()
         for batch in table.to_batches():
             for row in batch.to_pylist():
                 valid_tasks.append(

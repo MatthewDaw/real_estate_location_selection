@@ -5,9 +5,9 @@ Monitoring and management script for the enhanced scraping system
 
 import sys
 import time
-from datetime import datetime, timedelta
-from google.cloud import bigquery
+from datetime import datetime
 from tabulate import tabulate
+from scrapers.utils.big_query_wrapper import create_client
 
 
 class ScrapingMonitor:
@@ -16,7 +16,7 @@ class ScrapingMonitor:
     def __init__(self, project_id="flowing-flame-464314-j5", dataset_id="real_estate"):
         self.project_id = project_id
         self.dataset_id = dataset_id
-        self.client = bigquery.Client(project=project_id)
+        self.client = create_client(project=project_id)
 
     def get_comprehensive_status(self):
         """Get comprehensive status of the scraping system"""

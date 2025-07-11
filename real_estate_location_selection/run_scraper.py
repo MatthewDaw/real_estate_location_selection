@@ -7,6 +7,8 @@ from google.cloud import bigquery
 from datetime import datetime
 from typing import List
 
+from scrapers.utils.big_query_wrapper import create_client
+
 scrapers_config = {
     "dataset": "real_estate",
     "project_id": "flowing-flame-464314-j5",
@@ -33,7 +35,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
     """
     Enhanced queue puller with job deduplication and race-condition safety
     """
-    client = bigquery.Client(project=scrapers_config['project_id'])
+    client = create_client(project=scrapers_config['project_id'])
 
     source_config = scrapers_config[scraper_source]
     source_table = f"{scrapers_config['project_id']}.{scrapers_config['dataset']}.{source_config['table_name']}"
