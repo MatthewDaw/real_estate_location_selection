@@ -1,4 +1,7 @@
 
+import nest_asyncio
+nest_asyncio.apply()
+
 import uuid
 from real_estate_location_selection.scrapers.land_watch.land_watch_scraper import Landwatch
 from real_estate_location_selection.scrapers.zillow.zillow_scraper import Zillow
