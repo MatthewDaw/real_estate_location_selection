@@ -152,5 +152,6 @@ def run_scraper(scraper_source, batch_size):
         except Exception as ex:
             if attempts > 10:
                 raise ex
+            attempts += 1
             print(f"Exception encountered: {ex}")
             time.sleep(20)
