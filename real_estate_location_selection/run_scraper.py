@@ -6,6 +6,7 @@ from real_estate_location_selection.scrapers.utils.common_functions import get_b
 from google.cloud import bigquery
 from datetime import datetime
 from typing import List
+import time
 
 from real_estate_location_selection.scrapers.utils.big_query_wrapper import create_client
 
@@ -102,8 +103,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
         yield urls
 
 
-
-def run_scraper(scraper_source, batch_size):
+def run(scraper_source, batch_size):
     """
     Enhanced scraper runner with job deduplication and proper tracking
 
@@ -136,3 +136,21 @@ def run_scraper(scraper_source, batch_size):
                     error_count += 1
                     print(f"Failed to acknowledge successful processing of {url}")
             print(f"Batch complete. Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
+
+
+
+# google cloud will sometimes crash due to connectivity errors
+# there isn't really anything that we can do about this, other than
+# just restart
+def run_scraper(scraper_source, batch_size):
+    completed = False
+    attempts = 0
+    while not completed:
+        try:
+            run(scraper_source, batch_size)
+            completed = True
+        except Exception as ex:
+            if attempts > 10:
+                raise ex
+            print(f"Exception encountered: {ex}")
+            time.sleep(20)
