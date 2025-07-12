@@ -106,7 +106,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
         yield urls
 
 
-def run(scraper_source, batch_size):
+def run(scraper_source, batch_size, browser):
     """
     Enhanced scraper runner with job deduplication and proper tracking
 
@@ -119,7 +119,6 @@ def run(scraper_source, batch_size):
     process_id = f"{scraper_source}_{str(uuid.uuid4())[:8]}"
     print(f"Starting scraper with process ID: {process_id}")
 
-    browser = get_browser()
     scraper = scrapers_config[scraper_source]["scraper"](browser, scrapers_config[scraper_source]["states"])
 
     processed_count = 0
@@ -148,9 +147,10 @@ def run(scraper_source, batch_size):
 def run_scraper(scraper_source, batch_size):
     completed = False
     attempts = 0
+    browser = get_browser()
     while not completed:
         try:
-            run(scraper_source, batch_size)
+            run(scraper_source, batch_size, browser)
             completed = True
         except Exception as ex:
             if attempts > 10:
