@@ -21,7 +21,6 @@ ENV PYTHONIOENCODING=utf-8
 
 # Copy only dependency files first (for better caching)
 COPY pyproject.toml uv.lock* ./
-COPY pipelines/pyproject.toml ./pipelines/
 
 # Install dependencies using UV (this layer will be cached)
 RUN uv sync --frozen
