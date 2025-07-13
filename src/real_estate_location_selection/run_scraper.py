@@ -129,7 +129,7 @@ def run(scraper_source, batch_size, browser):
         batch_size (int): Number of messages to process in each batch
     """
     # Generate unique process ID for this scraper instance
-    process_id = f"{scraper_source}_{str(uuid.uuid4())[:8]}"
+    process_id = f"{scraper_source}_{str(uuid.uuid4())[:16]}"
     print(f"Starting scraper with process ID: {process_id}")
 
     scraper = scrapers_config[scraper_source]["scraper"](browser, scrapers_config[scraper_source]["states"])
