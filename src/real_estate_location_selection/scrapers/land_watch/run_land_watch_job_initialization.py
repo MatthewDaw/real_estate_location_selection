@@ -117,7 +117,7 @@ def prepare_tasks(scraper):
 def run_scraper():
     print("scraper started")
     browser = get_browser()
-    scraper = Landwatch(browser)
+    scraper = Landwatch(browser, ['UT', 'ID', 'NV', 'WY', 'MT', 'NH', 'CO', 'AZ', 'NM', 'TX', 'OK', 'KS', 'NE', 'IA', 'IL', 'MO', 'IN', 'AR', 'LA', 'MS', 'MI'])
     print("preparing tasks")
     prepare_tasks(scraper)
 

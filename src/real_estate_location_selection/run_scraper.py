@@ -58,10 +58,18 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
             processing_id = @process_id
         WHERE url IN (
           SELECT url
-          FROM `{source_table}`
-          WHERE state IN ('{states_str}')
-          AND scraped_at IS NULL
-          AND (last_pulled IS NULL OR last_pulled < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 HOUR))
+          FROM (
+            SELECT url,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY url 
+                     ORDER BY CASE WHEN scraped_at IS NULL THEN 0 ELSE 1 END
+                   ) as rn
+            FROM `{source_table}`
+            WHERE state IN ('{states_str}')
+            AND scraped_at IS NULL
+            AND (last_pulled IS NULL OR last_pulled < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 HOUR))
+          ) ranked
+          WHERE rn = 1
           ORDER BY RAND()
           LIMIT @batch_size
         )

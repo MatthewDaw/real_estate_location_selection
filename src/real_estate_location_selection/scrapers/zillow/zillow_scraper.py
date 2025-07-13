@@ -180,8 +180,7 @@ class Zillow(_Scraper):
 
             for listing_url in listing_urls_generator:
                 state_abbreviation = self._extract_state_from_url(listing_url)
-                # if state abbreviation is none, then this a canadian property and we don't care to
-                # process it
+                # if state abbreviation is none, then this a canadian property and we don't care to process it
                 if state_abbreviation is not None:
                     batch_entries.append({
                         'state': state_abbreviation,

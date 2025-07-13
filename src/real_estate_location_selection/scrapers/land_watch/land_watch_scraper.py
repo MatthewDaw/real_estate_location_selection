@@ -132,79 +132,80 @@ class Landwatch(_Scraper):
             pages_per_batch (int): Number of pages to process before batching (default: 25).
         """
         state_abbr = state_abbreviation.upper()
-        self.total_batches_processed = 0
+        if state_abbr in self.states_to_scrape:
+            self.total_batches_processed = 0
 
-        # Initialize state tracking
-        state_file = self._get_state_file_path(state_abbr)
-        completed_pages = self._load_completed_pages(state_file)
+            # Initialize state tracking
+            state_file = self._get_state_file_path(state_abbr)
+            completed_pages = self._load_completed_pages(state_file)
 
-        # Find the starting page (next page after the highest completed page)
-        page = max(completed_pages) + 1 if completed_pages else 1
+            # Find the starting page (next page after the highest completed page)
+            page = max(completed_pages) + 1 if completed_pages else 1
 
-        print(f"Starting from page {page} for {state_abbr}")
-        if completed_pages:
-            print(f"Previously completed pages: {sorted(completed_pages)}")
+            print(f"Starting from page {page} for {state_abbr}")
+            if completed_pages:
+                print(f"Previously completed pages: {sorted(completed_pages)}")
 
-        while True:
-            batch_entries = []
-            batch_start_page = page
-            current_batch_pages = []
+            while True:
+                batch_entries = []
+                batch_start_page = page
+                current_batch_pages = []
 
-            # Process pages in batches
-            for _ in range(pages_per_batch):
-                # Skip if this page was already completed
-                if page in completed_pages:
-                    print(f"Skipping page {page} - already completed")
+                # Process pages in batches
+                for _ in range(pages_per_batch):
+                    # Skip if this page was already completed
+                    if page in completed_pages:
+                        print(f"Skipping page {page} - already completed")
+                        page += 1
+                        continue
+
+                    url = f"https://www.landwatch.com{state_source}/page-{page}"
+                    self.close_page()
+                    self.goto_url(url)
+
+                    soup = BeautifulSoup(self.page.content(), "html.parser")
+                    links = [a["href"] for a in soup.find_all("a", href=True) if "/pid/" in a["href"]]
+
+                    if not links:
+                        print(f"No more links found at page {page}. Ending crawl.")
+                        if batch_entries:
+                            self._insert_url_batch(batch_entries)
+                            self.total_batches_processed += 1
+                            print(f"Final batch: processed {len(batch_entries)} URLs")
+                            # Save completed pages for this final batch
+                            self._save_completed_pages(state_file, completed_pages.union(current_batch_pages))
+                        print(f"Total batches processed: {self.total_batches_processed}")
+                        return
+
+                    # Add URLs to batch
+                    for link in links:
+                        batch_entries.append({
+                            'url': f"https://www.landwatch.com{link}",
+                            'state': state_abbr,
+                            'created_at': datetime.now(timezone.utc).isoformat(),
+                        })
+
+                    print(f"Page {page}: Found {len(links)} URLs")
+                    current_batch_pages.append(page)
                     page += 1
-                    continue
 
-                url = f"https://www.landwatch.com{state_source}/page-{page}"
-                self.close_page()
-                self.goto_url(url)
-
-                soup = BeautifulSoup(self.page.content(), "html.parser")
-                links = [a["href"] for a in soup.find_all("a", href=True) if "/pid/" in a["href"]]
-
-                if not links:
-                    print(f"No more links found at page {page}. Ending crawl.")
-                    if batch_entries:
+                # Insert batch when full
+                if batch_entries:
+                    try:
                         self._insert_url_batch(batch_entries)
                         self.total_batches_processed += 1
-                        print(f"Final batch: processed {len(batch_entries)} URLs")
-                        # Save completed pages for this final batch
-                        self._save_completed_pages(state_file, completed_pages.union(current_batch_pages))
-                    print(f"Total batches processed: {self.total_batches_processed}")
-                    return
 
-                # Add URLs to batch
-                for link in links:
-                    batch_entries.append({
-                        'url': f"https://www.landwatch.com{link}",
-                        'state': state_abbr,
-                        'created_at': datetime.now(timezone.utc).isoformat(),
-                    })
+                        # Update completed pages after successful batch insert
+                        completed_pages.update(current_batch_pages)
+                        self._save_completed_pages(state_file, completed_pages)
 
-                print(f"Page {page}: Found {len(links)} URLs")
-                current_batch_pages.append(page)
-                page += 1
+                        print(
+                            f"Batch {self.total_batches_processed}: processed pages {batch_start_page}-{page - 1} with {len(batch_entries)} URLs")
 
-            # Insert batch when full
-            if batch_entries:
-                try:
-                    self._insert_url_batch(batch_entries)
-                    self.total_batches_processed += 1
-
-                    # Update completed pages after successful batch insert
-                    completed_pages.update(current_batch_pages)
-                    self._save_completed_pages(state_file, completed_pages)
-
-                    print(
-                        f"Batch {self.total_batches_processed}: processed pages {batch_start_page}-{page - 1} with {len(batch_entries)} URLs")
-
-                except Exception as e:
-                    print(f"Error inserting batch: {e}")
-                    print(f"Pages {current_batch_pages} will be retried on next run")
-                    raise
+                    except Exception as e:
+                        print(f"Error inserting batch: {e}")
+                        print(f"Pages {current_batch_pages} will be retried on next run")
+                        raise
 
     def _get_state_file_path(self, state_abbr):
         """Get the path for the state tracking file."""
