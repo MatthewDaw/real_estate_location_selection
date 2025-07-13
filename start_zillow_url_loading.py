@@ -23,7 +23,11 @@ request = batch_v1.CreateJobRequest(
                     runnables=[
                         batch_v1.Runnable(
                             container=batch_v1.Runnable.Container(
-                                image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest"
+                                image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest",
+                                commands=[
+                                    "-c",
+                                    "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && exec uv run real_estate_location_selection/scrapers/land_watch/run_zillow_job_initialization.py"
+                                ]
                             ),
                             environment=batch_v1.Environment(
                                 variables={
