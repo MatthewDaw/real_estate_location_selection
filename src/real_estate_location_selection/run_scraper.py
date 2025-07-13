@@ -166,7 +166,7 @@ def run_scraper(scraper_source, batch_size):
     attempts = 0
     browser = get_browser()
     start_time = time.time()
-    print("Start time: {}".format(start_time))
+    print("Start time for scraping: {}".format(start_time))
     while not completed:
         try:
             run(scraper_source, batch_size, browser)
