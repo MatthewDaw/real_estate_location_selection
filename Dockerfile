@@ -19,17 +19,21 @@ ENV PATH="/root/.local/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONIOENCODING=utf-8
 
-# Copy project files
-COPY . .
+# Copy only dependency files first (for better caching)
+COPY pyproject.toml uv.lock* ./
+COPY pipelines/pyproject.toml ./pipelines/
 
-# Install dependencies using UV
-RUN uv sync
+# Install dependencies using UV (this layer will be cached)
+RUN uv sync --frozen
+
+# Install camoufox browser (this can also be cached)
+RUN uv run -m camoufox fetch
+
+# Now copy the rest of the project files
+COPY . .
 
 # Install the package in development mode
 RUN uv pip install -e .
-
-# Install camoufox browser
-RUN uv run -m camoufox fetch
 
 # Accept build argument for which scraper to run
 ARG SCRAPER_PATH
@@ -38,6 +42,7 @@ ENV SCRAPER_PATH=${SCRAPER_PATH}
 # Define environment variable for display
 ENV DISPLAY=:99
 
+# Set working directory to src before running the command
 WORKDIR /app/src
 
 # Run the specified scraper with output redirection
