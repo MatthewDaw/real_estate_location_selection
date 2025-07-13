@@ -7,12 +7,6 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 
-[manifest]
-members = [
-    "pipelines",
-    "real-estate-location-selection",
-]
-
 [[package]]
 name = "agate"
 version = "1.9.1"
@@ -1299,11 +1293,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pipelines"
-version = "0.1.0"
-source = { editable = "pipelines" }
-
-[[package]]
 name = "platformdirs"
 version = "4.3.8"
 source = { registry = "https://pypi.org/simple" }
@@ -1792,7 +1781,7 @@ wheels = [
 [[package]]
 name = "real-estate-location-selection"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "browserforge" },
@@ -1813,7 +1802,6 @@ dependencies = [
     { name = "lxml" },
     { name = "nest-asyncio" },
     { name = "pandas" },
-    { name = "pipelines" },
     { name = "psycopg" },
     { name = "psycopg-binary" },
     { name = "psycopg2-binary" },
@@ -1845,7 +1833,6 @@ requires-dist = [
     { name = "lxml", specifier = "==5.4.0" },
     { name = "nest-asyncio", specifier = ">=1.6.0" },
     { name = "pandas", specifier = ">=2.3.1" },
-    { name = "pipelines", editable = "pipelines" },
     { name = "psycopg", specifier = "==3.2.9" },
     { name = "psycopg-binary", specifier = "==3.2.9" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
