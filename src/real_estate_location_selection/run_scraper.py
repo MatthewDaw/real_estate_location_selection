@@ -57,7 +57,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
             last_pulled = @update_timestamp,
             processing_id = @process_id
         WHERE url IN (
-          SELECT url
+          SELECT DISTINCT url
           FROM (
             SELECT url,
                    ROW_NUMBER() OVER (
@@ -75,7 +75,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
             )
           ) ranked
           WHERE rn = 1
-          AND scraped_at IS NULL  -- Double-check this row itself has scraped_at IS NULL
+          AND scraped_at IS NULL
           ORDER BY RAND()
           LIMIT @batch_size
         )
@@ -103,7 +103,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
 
         # Step 2: Get URLs that THIS process actually claimed
         select_query = f"""
-        SELECT url
+        SELECT distinct url
         FROM `{source_table}`
         WHERE last_pulled = @update_timestamp 
         AND processing_id = @process_id
