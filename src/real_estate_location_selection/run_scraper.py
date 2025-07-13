@@ -52,34 +52,29 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
         # Step 1: Update with both process_id and timestamp as markers
         states_str = "', '".join(states)
         update_query = f"""
-        UPDATE `{source_table}`
-        SET 
-            last_pulled = @update_timestamp,
-            processing_id = @process_id
-        WHERE url IN (
-          SELECT DISTINCT url
-          FROM (
-            SELECT url,
-                   ROW_NUMBER() OVER (
-                     PARTITION BY url 
-                     ORDER BY CASE WHEN scraped_at IS NULL THEN 0 ELSE 1 END
-                   ) as rn
-            FROM `{source_table}`
-            WHERE state IN ('{states_str}')
-            AND (last_pulled IS NULL OR last_pulled < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 HOUR))
-            -- Only include URLs where ALL rows have scraped_at IS NULL
-            AND url NOT IN (
-              SELECT DISTINCT url 
-              FROM `{source_table}` 
-              WHERE scraped_at IS NOT NULL
-            )
-          ) ranked
-          WHERE rn = 1
-          AND scraped_at IS NULL
-          ORDER BY RAND()
-          LIMIT @batch_size
-        )
-        """
+                UPDATE `{source_table}`
+                SET 
+                    last_pulled = @update_timestamp,
+                    processing_id = @process_id
+                WHERE url IN (
+                  SELECT DISTINCT url
+                  FROM (
+                    SELECT url,
+                    FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+                    WHERE state IN ('{states_str}')
+                    -- Only include URLs where ALL rows have scraped_at IS NULL
+                    AND url NOT IN (
+                      SELECT DISTINCT url 
+                      FROM `{source_table}` 
+                      WHERE scraped_at IS NOT NULL
+                      OR 
+                      last_pulled > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 HOUR)
+                    )
+                  ) filtered
+                  ORDER BY RAND()
+                  LIMIT @batch_size
+                )
+                """
 
         update_config = bigquery.QueryJobConfig(
             query_parameters=[
@@ -166,6 +161,7 @@ def run_scraper(scraper_source, batch_size):
     completed = False
     attempts = 0
     browser = get_browser()
+    run(scraper_source, batch_size, browser)
     while not completed:
         try:
             run(scraper_source, batch_size, browser)
