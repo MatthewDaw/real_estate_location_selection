@@ -137,21 +137,25 @@ def run(scraper_source, batch_size, browser):
     processed_count = 0
     success_count = 0
     error_count = 0
-
-    for urls in pull_from_queue(scraper_source, batch_size, process_id):
-        if urls:
-            print(f"Processing batch of {len(urls)} URLs")
-            processed_count += len(urls)
-            # Process URLs and get list of successfully processed ones
-            successfully_scraped_urls = scraper.process_urls(urls)
-            for url in urls:
-                if url in successfully_scraped_urls:
-                    success_count += 1
-                else:
-                    error_count += 1
-                    print(f"Failed to acknowledge successful processing of {url}")
-            print(f"Batch complete. Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
-
+    retry_count = 0
+    while retry_count < 5:
+        for urls in pull_from_queue(scraper_source, batch_size, process_id):
+            if urls:
+                retry_count = 0
+                print(f"Processing batch of {len(urls)} URLs")
+                processed_count += len(urls)
+                # Process URLs and get list of successfully processed ones
+                successfully_scraped_urls = scraper.process_urls(urls)
+                for url in urls:
+                    if url in successfully_scraped_urls:
+                        success_count += 1
+                    else:
+                        error_count += 1
+                        print(f"Failed to acknowledge successful processing of {url}")
+                print(f"Batch complete. Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
+            else:
+                retry_count += 1
+                time.sleep(20)
 
 
 # google cloud will sometimes crash due to connectivity errors

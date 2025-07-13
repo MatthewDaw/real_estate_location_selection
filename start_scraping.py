@@ -373,10 +373,10 @@ class UnifiedScraperDispatcher:
 def main():
     # Configuration
     PROJECT_ID = "flowing-flame-464314-j5"
-    LANDWATCH_TASK_COUNT = 16  # Number of LandWatch tasks to distribute
-    ZILLOW_TASK_COUNT = 0  # Number of Zillow tasks to distribute
+    LANDWATCH_TASK_COUNT = 0  # Number of LandWatch tasks to distribute
+    ZILLOW_TASK_COUNT = 60  # Number of Zillow tasks to distribute
     PROVISIONING_MODEL = "SPOT"  # Options: "STANDARD" or "SPOT"
-    MAX_TASKS_PER_REGION = 60  # Maximum tasks per region to ensure we stay within quota
+    MAX_TASKS_PER_REGION = 8  # Maximum tasks per region to ensure we stay within quota
     USE_QUOTA_CHECKING = True  # Set to False if you don't have google-cloud-compute installed
 
     # Define which region groups to use (in priority order)
