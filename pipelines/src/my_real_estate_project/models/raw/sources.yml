@@ -1,0 +1,16 @@
+# models/raw/sources.yml
+version: 2
+
+sources:
+  - name: raw_data
+    description: Raw data from external sources
+    schema: public
+    tables:
+      - name: hello_data_buildings_raw
+        description: Raw buildings data from Hello Data
+      - name: hello_data_units_raw
+        description: Raw units data from Hello Data
+      - name: zillow_property_raw
+        description: Raw Zillow property listings
+      - name: landwatch_properties_raw
+        description: Raw Landwatch property listings

@@ -1,0 +1,13 @@
+version: 2
+
+models:
+  - name: dim_properties
+    description: "Dimensional table combining building and unit information"
+    columns:
+      - name: id
+        description: "Unique building identifier"
+        data_tests:
+          - unique
+          - not_null
+      - name: total_units
+        description: "Total number of units in the building"
