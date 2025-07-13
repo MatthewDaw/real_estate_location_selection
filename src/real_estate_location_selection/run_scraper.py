@@ -60,7 +60,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
                   SELECT DISTINCT url
                   FROM (
                     SELECT url,
-                    FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+                    FROM `{source_table}` 
                     WHERE state IN ('{states_str}')
                     -- Only include URLs where ALL rows have scraped_at IS NULL
                     AND url NOT IN (
