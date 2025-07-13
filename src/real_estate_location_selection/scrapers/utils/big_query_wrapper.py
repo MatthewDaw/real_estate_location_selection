@@ -134,7 +134,6 @@ class Client(bigquery.Client):
                     location=location,
                     project=project,
                     job_retry=job_retry,
-                    job_timeout=job_timeout,
                     *args,
                     **kwargs
                 )
