@@ -91,7 +91,7 @@ class UnifiedScraperDispatcher:
         self.job_configs = {
             'landwatch': {
                 'job_prefix': 'land-watch-collection',
-                'script_path': 'real_estate_location_selection/scrapers/land_watch/run_land_watch_scraper.py'
+                'script_path': 'src/real_estate_location_selection/scrapers/land_watch/run_land_watch_scraper.py'
             },
             'zillow': {
                 'job_prefix': 'zillow-collection',

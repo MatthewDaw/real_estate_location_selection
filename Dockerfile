@@ -38,5 +38,7 @@ ENV SCRAPER_PATH=${SCRAPER_PATH}
 # Define environment variable for display
 ENV DISPLAY=:99
 
+WORKDIR /app/src
+
 # Run the specified scraper with output redirection
 CMD ["sh", "-c", "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && exec uv run ${SCRAPER_PATH}"]
