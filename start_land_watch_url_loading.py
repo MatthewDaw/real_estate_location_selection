@@ -58,6 +58,7 @@ request = batch_v1.CreateJobRequest(
         logs_policy=batch_v1.LogsPolicy(destination="CLOUD_LOGGING"),
     ),
 )
-client = batch_v1.BatchServiceClient()
-response = client.create_job(request=request)
-print(response)
+if __name__ == '__main__':
+    client = batch_v1.BatchServiceClient()
+    response = client.create_job(request=request)
+    print(response)
