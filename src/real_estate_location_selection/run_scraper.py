@@ -165,7 +165,7 @@ def run_scraper(scraper_source, batch_size):
     completed = False
     attempts = 0
     browser = get_browser()
-    run(scraper_source, batch_size, browser)
+    start_time = 0
     while not completed:
         try:
             run(scraper_source, batch_size, browser)
@@ -173,6 +173,7 @@ def run_scraper(scraper_source, batch_size):
         except Exception as ex:
             if attempts > 10:
                 raise ex
-            attempts += 1
+            if time.time() - start_time < 240:
+                attempts += 1
             print(f"Exception encountered: {ex}")
             time.sleep(20)
