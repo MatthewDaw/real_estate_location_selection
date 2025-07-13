@@ -6,44 +6,64 @@ WHERE created_at < (
     WHERE p2.url = `flowing-flame-464314-j5.real_estate.landwatch_properties`.url
 );
 
--- deduplicat landwatch_urls
+-- deduplicate landwatch_urls
 DELETE FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
-WHERE created_at < (
-    SELECT MAX(created_at)
-    FROM `flowing-flame-464314-j5.real_estate.landwatch_urls` as p2
-    WHERE p2.url = `flowing-flame-464314-j5.real_estate.landwatch_urls`.url
+WHERE created_at NOT IN (
+    SELECT created_at
+    FROM (
+        SELECT created_at,
+               ROW_NUMBER() OVER (
+                   PARTITION BY url
+                   ORDER BY
+                       CASE WHEN scraped_at IS NULL THEN 0 ELSE 1 END,
+                       created_at DESC
+               ) as rn
+        FROM `flowing-flame-464314-j5.real_estate.landwatch_urls`
+    ) ranked
+    WHERE rn = 1
 );
 
--- deduplicat zillow_property_details
-DELETE FROM `flowing-flame-464314-j5.real_estate.zillow_property_details`
-WHERE created_at < (
-    SELECT MAX(created_at)
-    FROM `flowing-flame-464314-j5.real_estate.zillow_property_details` as p2
-    WHERE p2.source_url = `flowing-flame-464314-j5.real_estate.zillow_property_details`.source_url
-);
-
--- deduplicat zillow_urls
+-- deduplicate zillow_urls
 DELETE FROM `flowing-flame-464314-j5.real_estate.zillow_urls`
-WHERE created_at < (
-    SELECT MAX(created_at)
-    FROM `flowing-flame-464314-j5.real_estate.zillow_urls` as p2
-    WHERE p2.url = `flowing-flame-464314-j5.real_estate.zillow_urls`.url
+WHERE created_at NOT IN (
+    SELECT created_at
+    FROM (
+        SELECT created_at,
+               ROW_NUMBER() OVER (
+                   PARTITION BY url
+                   ORDER BY
+                       CASE WHEN scraped_at IS NULL THEN 0 ELSE 1 END,
+                       created_at DESC
+               ) as rn
+        FROM `flowing-flame-464314-j5.real_estate.zillow_urls`
+    ) ranked
+    WHERE rn = 1
 );
 
 -- mark scraped landwatch urls as scraped
 UPDATE `flowing-flame-464314-j5.real_estate.landwatch_urls` AS urls
 SET scraped_at = DATE(props.created_at)
-FROM `flowing-flame-464314-j5.real_estate.landwatch_properties` AS props
+FROM (
+  SELECT url, created_at,
+         ROW_NUMBER() OVER (PARTITION BY url ORDER BY created_at DESC) as rn
+  FROM `flowing-flame-464314-j5.real_estate.landwatch_properties`
+) AS props
 WHERE urls.url = props.url
-  AND urls.scraped_at IS NULL;
+  AND urls.scraped_at IS NULL
+  AND props.rn = 1;
 
 
 -- mark scraped zillow urls as scraped
 UPDATE `flowing-flame-464314-j5.real_estate.zillow_urls` AS urls
 SET scraped_at = DATE(props.created_at)
-FROM `flowing-flame-464314-j5.real_estate.zillow_property_details` AS props
+FROM (
+  SELECT source_url, created_at,
+         ROW_NUMBER() OVER (PARTITION BY source_url ORDER BY created_at DESC) as rn
+  FROM `flowing-flame-464314-j5.real_estate.zillow_property_details`
+) AS props
 WHERE urls.url = props.source_url
-  AND urls.scraped_at IS NULL;
+  AND urls.scraped_at IS NULL
+  AND props.rn = 1;
 
 -- set landwatch urls never scraped as not scraped
 UPDATE `flowing-flame-464314-j5.real_estate.landwatch_urls`
