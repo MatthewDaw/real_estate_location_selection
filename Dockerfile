@@ -22,13 +22,20 @@ ENV PYTHONIOENCODING=utf-8
 # Copy only dependency files first (for better caching)
 COPY pyproject.toml uv.lock* ./
 
+# Create a minimal src directory structure for dependency installation
+RUN mkdir -p src/real_estate_location_selection src/pipelines && \
+    touch src/real_estate_location_selection/__init__.py src/pipelines/__init__.py
+
+# Copy README for setuptools
+COPY README.md ./
+
 # Install dependencies using UV (this layer will be cached)
 RUN uv sync --frozen
 
 # Install camoufox browser (this can also be cached)
 RUN uv run -m camoufox fetch
 
-# Now copy the rest of the project files
+# Now copy the rest of the project files (this will overwrite the minimal structure)
 COPY . .
 
 # Install the package in development mode
