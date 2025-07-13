@@ -91,7 +91,7 @@ class UnifiedScraperDispatcher:
         self.job_configs = {
             'landwatch': {
                 'job_prefix': 'land-watch-collection',
-                'script_path': 'src/real_estate_location_selection/scrapers/land_watch/run_land_watch_scraper.py'
+                'script_path': 'real_estate_location_selection/scrapers/land_watch/run_land_watch_scraper.py'
             },
             'zillow': {
                 'job_prefix': 'zillow-collection',
@@ -373,8 +373,8 @@ class UnifiedScraperDispatcher:
 def main():
     # Configuration
     PROJECT_ID = "flowing-flame-464314-j5"
-    LANDWATCH_TASK_COUNT = 0  # Number of LandWatch tasks to distribute
-    ZILLOW_TASK_COUNT = 80  # Number of Zillow tasks to distribute
+    LANDWATCH_TASK_COUNT = 1  # Number of LandWatch tasks to distribute
+    ZILLOW_TASK_COUNT = 0  # Number of Zillow tasks to distribute
     PROVISIONING_MODEL = "SPOT"  # Options: "STANDARD" or "SPOT"
     MAX_TASKS_PER_REGION = 8  # Maximum tasks per region to ensure we stay within quota
     USE_QUOTA_CHECKING = True  # Set to False if you don't have google-cloud-compute installed

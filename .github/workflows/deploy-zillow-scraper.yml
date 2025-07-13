@@ -7,7 +7,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -22,23 +21,23 @@ jobs:
         with:
           install_components: beta
 
-      - run: gcloud config set builds/use_kaniko True
-
       - name: Create temporary cloudbuild.yaml
         run: |
           cat > cloudbuild.yaml << EOF
           steps:
-            - name: 'gcr.io/cloud-builders/docker'
-              args: [
-                'build',
-                '--build-arg', 'SCRAPER_PATH=real_estate_location_selection/scrapers/zillow/run_zillow_job_initialization.py',
-                '-t', 'us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest',
-                '.'
-              ]
-            - name: 'gcr.io/cloud-builders/docker'
-              args: ['push', 'us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest']
+            - name: 'gcr.io/kaniko-project/executor:latest'
+              args:
+                - --dockerfile=Dockerfile
+                - --destination=us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest
+                - --cache=true
+                - --cache-repo=us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/cache
+                - --context=dir://.
+                - --build-arg=SCRAPER_PATH=real_estate_location_selection/scrapers/zillow/run_zillow_job_initialization.py
           options:
+            machineType: 'E2_HIGHCPU_8'
+            diskSizeGb: 100
             logging: CLOUD_LOGGING_ONLY
+          timeout: 1200s
           EOF
 
       - run: gcloud builds submit --config=cloudbuild.yaml
