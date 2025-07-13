@@ -155,7 +155,7 @@ def run(scraper_source, batch_size, browser):
                 print(f"Batch complete. Processed: {processed_count}, Success: {success_count}, Errors: {error_count}")
             else:
                 retry_count += 1
-                time.sleep(20)
+                time.sleep(10)
 
 
 # google cloud will sometimes crash due to connectivity errors
