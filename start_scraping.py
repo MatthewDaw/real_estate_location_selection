@@ -376,7 +376,7 @@ def main():
     LANDWATCH_TASK_COUNT = 0  # Number of LandWatch tasks to distribute
     ZILLOW_TASK_COUNT = 80  # Number of Zillow tasks to distribute
     PROVISIONING_MODEL = "SPOT"  # Options: "STANDARD" or "SPOT"
-    MAX_TASKS_PER_REGION = 12  # Maximum tasks per region to ensure we stay within quota
+    MAX_TASKS_PER_REGION = 8  # Maximum tasks per region to ensure we stay within quota
     USE_QUOTA_CHECKING = True  # Set to False if you don't have google-cloud-compute installed
 
     # Define which region groups to use (in priority order)
