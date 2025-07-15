@@ -1,10 +1,12 @@
+import hashlib
 import json
 import re
-import hashlib
 from datetime import datetime
+
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
-from real_estate_location_selection.scrapers._scraper import _Scraper, Task
+
+from real_estate_location_selection.scrapers._scraper import _Scraper
 
 
 class Zillow(_Scraper):

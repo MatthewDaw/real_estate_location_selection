@@ -1,15 +1,18 @@
+import hashlib
 import json
 import re
-from datetime import datetime, date
-from google.cloud import bigquery
-from google.cloud.exceptions import NotFound
-from bs4 import BeautifulSoup
-from haversine import haversine, Unit
-from real_estate_location_selection.scrapers._scraper import _Scraper, Task
-from real_estate_location_selection.scrapers.utils.common_functions import safe_get, safe_lower, safe_divide
-import hashlib
+from datetime import date
 from datetime import datetime, timezone
 from pathlib import Path
+
+from bs4 import BeautifulSoup
+from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
+from haversine import haversine, Unit
+
+from real_estate_location_selection.scrapers._scraper import _Scraper
+from real_estate_location_selection.scrapers.utils.common_functions import safe_get, safe_lower, safe_divide
+
 
 class Landwatch(_Scraper):
     """

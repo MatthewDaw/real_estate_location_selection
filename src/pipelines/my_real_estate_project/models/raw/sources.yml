@@ -10,6 +10,8 @@ sources:
         description: Raw buildings data from Hello Data
       - name: hello_data_units_raw
         description: Raw units data from Hello Data
+      - name: hello_data_units_history_raw
+        description: Raw units history data from Hello Data
       - name: zillow_property_raw
         description: Raw Zillow property listings
       - name: landwatch_properties_raw

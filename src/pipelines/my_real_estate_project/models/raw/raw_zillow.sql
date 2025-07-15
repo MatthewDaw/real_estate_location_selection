@@ -53,4 +53,4 @@ select
     risks,
     description,
     foreclosure
-from {{ source('raw_data', 'zillow_property_raw') }}
+from {{ source('raw_data', 'zillow_property_raw') }}  limit 1000

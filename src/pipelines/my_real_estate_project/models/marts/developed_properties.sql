@@ -1,6 +1,6 @@
--- models/marts/for_sale.sql
+-- models/marts/developed_properties.sql
 
-with zillow_standardized as (
+with zillow_developed as (
     select
         -- Identifiers
         'zillow' as source_platform,
@@ -63,9 +63,20 @@ with zillow_standardized as (
         avg_school_distance
 
     from {{ ref('stg_zillow') }}
+    where
+        home_type in (
+            'condo',
+            'townhouse',
+            'apartment',
+            'manufactured',
+            'multi_family',
+            'single_family',
+            'home_type_unknown'
+        )
+        or bedrooms > 0
 ),
 
-landwatch_standardized as (
+landwatch_developed as (
     select
         -- Identifiers
         'landwatch' as source_platform,
@@ -126,12 +137,19 @@ landwatch_standardized as (
         distance_to_city_miles as avg_school_distance
 
     from {{ ref('stg_landwatch') }}
+    where property_type in (
+        'recreational-property',
+        'commercial-property',
+        'homes',
+        'horse-property'
+    )
+    and (beds > 0 or baths > 0 or homesqft > 0)
 ),
 
 landwatch_duplicates as (
     select distinct l.source_id as landwatch_id
-    from landwatch_standardized l
-    inner join zillow_standardized z on (
+    from landwatch_developed l
+    inner join zillow_developed z on (
         st_dwithin(l.geog_point, z.geog_point, 45.72)
         or (
             l.street_address ilike z.street_address
@@ -143,13 +161,13 @@ landwatch_duplicates as (
 
 landwatch_deduplicated as (
     select l.*
-    from landwatch_standardized l
+    from landwatch_developed l
     left join landwatch_duplicates ld on l.source_id = ld.landwatch_id
     where ld.landwatch_id is null
 ),
 
-unified_properties as (
-    select * from zillow_standardized
+unified_developed_properties as (
+    select * from zillow_developed
     union all
     select * from landwatch_deduplicated
 )
@@ -157,4 +175,4 @@ unified_properties as (
 select
     row_number() over (order by source_platform, source_id) as unified_id,
     *
-from unified_properties
+from unified_developed_properties

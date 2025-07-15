@@ -272,3 +272,23 @@ CREATE TABLE hello_data_units_raw (
 
     PRIMARY KEY (id)
 );
+
+
+
+CREATE TABLE hello_data_units_history_raw (
+    building_id uuid,
+    unit_id uuid,
+    min_price integer,
+    price integer,
+    max_price integer,
+    availability date,
+    from_date date,
+    to_date date,
+    min_effective_price integer,
+    effective_price integer,
+    max_effective_price integer,
+    period_id integer,
+    price_plans jsonb,
+    lease_term integer,
+    _data_pipeline_only_state text
+);

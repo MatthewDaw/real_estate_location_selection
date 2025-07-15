@@ -1,7 +1,8 @@
-import folium
-from folium.plugins import HeatMap
 import branca.colormap as cm
+import folium
 import pandas as pd
+from folium.plugins import HeatMap
+
 
 def create_heatmap(
     df: pd.DataFrame,

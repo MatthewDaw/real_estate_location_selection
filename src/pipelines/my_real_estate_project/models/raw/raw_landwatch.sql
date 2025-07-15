@@ -1,3 +1,5 @@
+-- models/raw/raw_landwatch.sql
+
 select
     id,
     url,
@@ -43,4 +45,4 @@ select
     cost_per_acre,
     distance_to_city_miles,
     cost_per_homesqft
-from {{ source('raw_data', 'landwatch_properties_raw') }}
+from {{ source('raw_data', 'landwatch_properties_raw') }}  limit 1000

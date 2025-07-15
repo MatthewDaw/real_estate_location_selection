@@ -35,4 +35,4 @@ select
     lease_term,
     _data_pipeline_only_state as state,
     source_id
-from {{ source('raw_data', 'hello_data_units_raw') }}
+from {{ source('raw_data', 'hello_data_units_raw') }}  limit 1000

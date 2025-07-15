@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-Script to copy all data from the 'buildings' and 'units' tables from one PostgreSQL instance to another.
+Script to copy all data from the 'buildings', 'units', and 'units_history' tables from one PostgreSQL instance to another.
 """
 
-import os
-import psycopg2
-import psycopg2.extras
-from typing import Optional
 import logging
+import psycopg2.extras
+from pipelines.pipelines.utils import get_hello_data_connection, get_local_data_connection, get_table_columns
 
 # Set up logging
 logging.basicConfig(
@@ -31,36 +29,15 @@ TABLE_CONFIGS = {
         'state_column': '_data_pipeline_only_state',
         'order_column': 'id',
         'special_columns': []
+    },
+    'units_history': {
+        'source_table': 'units_history',
+        'dest_table': 'hello_data_units_history_raw',
+        'state_column': '_data_pipeline_only_state',
+        'order_column': 'building_id',
+        'special_columns': ['price_plans']
     }
 }
-
-
-def get_connection(host: str, database: str, user: str, password: str) -> psycopg2.extensions.connection:
-    """Create a PostgreSQL connection."""
-    try:
-        conn = psycopg2.connect(
-            host=host,
-            database=database,
-            user=user,
-            password=password
-        )
-        return conn
-    except psycopg2.Error as e:
-        logger.error(f"Error connecting to database: {e}")
-        raise
-
-
-def get_table_columns(cursor, table_name: str) -> list:
-    """Get all column names from the specified table."""
-    cursor.execute("""
-                   SELECT column_name
-                   FROM information_schema.columns
-                   WHERE table_name = %s
-                     AND table_schema = 'public'
-                   ORDER BY ordinal_position
-                   """, (table_name,))
-    columns = [row[0] for row in cursor.fetchall()]
-    return columns
 
 
 def copy_state_data(state: str, source_conn, dest_conn, table_config: dict, columns: list) -> int:
@@ -87,18 +64,25 @@ def copy_state_data(state: str, source_conn, dest_conn, table_config: dict, colu
     logger.info(f"Copying {state_total_rows} rows for state {state} from {source_table}")
 
     # Copy data in batches
-    batch_size = 15000
+    batch_size = 150000
     offset = 0
     copied_rows = 0
 
     columns_str = ', '.join([f'"{col}"' for col in columns])
     placeholders = ', '.join(['%s'] * len(columns))
 
-    insert_query = f"""
-        INSERT INTO {dest_table} ({columns_str})
-        VALUES ({placeholders})
-        ON CONFLICT (id) DO NOTHING
-    """
+    # Different conflict resolution for units_history (no unique id column)
+    if source_table == 'units_history':
+        insert_query = f"""
+            INSERT INTO {dest_table} ({columns_str})
+            VALUES ({placeholders})
+        """
+    else:
+        insert_query = f"""
+            INSERT INTO {dest_table} ({columns_str})
+            VALUES ({placeholders})
+            ON CONFLICT (id) DO NOTHING
+        """
 
     while offset < state_total_rows:
         # Fetch batch from source for this state
@@ -126,16 +110,33 @@ def copy_state_data(state: str, source_conn, dest_conn, table_config: dict, colu
 
                 # Handle special conversions for specific columns
                 if col in special_columns and value is not None:
-                    # Convert string representation of array to list
-                    if isinstance(value, str):
-                        try:
-                            # Parse the string as a Python list and convert to PostgreSQL array format
-                            import json
-                            parsed_list = json.loads(value)
-                            value = parsed_list
-                        except (json.JSONDecodeError, ValueError):
-                            # If parsing fails, keep as None
-                            value = None
+                    if col in ['unit_mix', 'unit_mix_old']:
+                        # Convert string representation of array to list
+                        if isinstance(value, str):
+                            try:
+                                import json
+                                parsed_list = json.loads(value)
+                                value = parsed_list
+                            except (json.JSONDecodeError, ValueError):
+                                value = None
+                    elif col == 'price_plans':
+                        # Handle JSONB data - ensure it's properly formatted for PostgreSQL
+                        import json
+                        if isinstance(value, str):
+                            try:
+                                # Parse string to Python object, then convert back to JSON string
+                                parsed_data = json.loads(value)
+                                value = json.dumps(parsed_data)
+                            except (json.JSONDecodeError, ValueError):
+                                value = None
+                        elif isinstance(value, (list, dict)):
+                            # Convert Python object to JSON string
+                            try:
+                                value = json.dumps(value)
+                            except (TypeError, ValueError):
+                                value = None
+                        # If it's already a string that looks like JSON, keep it as is
+                        # PostgreSQL will handle the conversion to JSONB
 
                 row_values.append(value)
 
@@ -213,61 +214,32 @@ def copy_all_tables():
 
     states = ['UT']
 
-    # Get source database credentials
-    source_host = os.getenv('HELLO_DATA_DB_HOST').split(':')[0]
-    source_db = os.getenv('HELLO_DATA_DB_NAME')
-    source_user = os.getenv('HELLO_DATA_DB_USER')
-    source_pass = os.getenv('HELLO_DATA_DB_PASS')
-
-    # Get destination database credentials
-    dest_host = os.getenv('LOCAL_DB_HOST')
-    dest_db = os.getenv('LOCAL_DB_NAME')
-    dest_user = os.getenv('LOCAL_DB_USER')
-    dest_pass = os.getenv('LOCAL_DB_PASS')
-
-    # Validate environment variables
-    required_vars = [
-        ('HELLO_DATA_DB_HOST', source_host),
-        ('HELLO_DATA_DB_NAME', source_db),
-        ('HELLO_DATA_DB_USER', source_user),
-        ('HELLO_DATA_DB_PASS', source_pass),
-        ('LOCAL_DB_HOST', dest_host),
-        ('LOCAL_DB_NAME', dest_db),
-        ('LOCAL_DB_USER', dest_user),
-        ('LOCAL_DB_PASS', dest_pass)
-    ]
-
-    missing_vars = [var_name for var_name, var_value in required_vars if not var_value]
-    if missing_vars:
-        logger.error(f"Missing environment variables: {', '.join(missing_vars)}")
-        return False
-
     source_conn = None
     dest_conn = None
 
     try:
-        # Connect to source database
+        # Connect to databases using utility functions
         logger.info("Connecting to source database...")
-        source_conn = get_connection(source_host, source_db, source_user, source_pass)
+        source_conn = get_hello_data_connection()
 
-        # Connect to destination database
         logger.info("Connecting to destination database...")
-        dest_conn = get_connection(dest_host, dest_db, dest_user, dest_pass)
+        dest_conn = get_local_data_connection()
 
         # Copy each table
         overall_success = True
         table_results = {}
 
         for table_key in TABLE_CONFIGS.keys():
-            logger.info("=" * 60)
-            logger.info(f"PROCESSING TABLE: {table_key.upper()}")
-            logger.info("=" * 60)
+            if table_key != 'units_history':
+                logger.info("=" * 60)
+                logger.info(f"PROCESSING TABLE: {table_key.upper()}")
+                logger.info("=" * 60)
 
-            result = copy_table_data(table_key, source_conn, dest_conn, states)
-            table_results[table_key] = result
+                result = copy_table_data(table_key, source_conn, dest_conn, states)
+                table_results[table_key] = result
 
-            if not result['success']:
-                overall_success = False
+                if not result['success']:
+                    overall_success = False
 
         # Overall Summary
         logger.info("=" * 60)
@@ -291,13 +263,8 @@ def copy_all_tables():
 
         return overall_success
 
-    except psycopg2.Error as e:
-        logger.error(f"Database error: {e}")
-        if dest_conn:
-            dest_conn.rollback()
-        return False
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
+        logger.error(f"Error in copy process: {e}")
         return False
     finally:
         # Close connections
@@ -311,7 +278,7 @@ def copy_all_tables():
 
 def main():
     """Main function."""
-    logger.info("Starting buildings and units table copy...")
+    logger.info("Starting buildings, units, and units_history table copy...")
     success = copy_all_tables()
 
     if success:

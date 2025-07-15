@@ -1,11 +1,10 @@
-import time
-import csv
 import re
+import time
 from urllib.parse import urljoin
 
+import pandas as pd
 import requests
 import requests_cache
-import pandas as pd
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 

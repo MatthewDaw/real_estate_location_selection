@@ -1,10 +1,11 @@
-from real_estate_location_selection.connection import local_db_connection
-import pandas as pd
 import os
-import numpy as np
-from scipy.spatial import cKDTree
 from math import radians, cos, sin, asin, sqrt, exp
+
+import numpy as np
 import pandas as pd
+from scipy.spatial import cKDTree
+
+from real_estate_location_selection.connection import local_db_connection
 
 # Show all columns
 pd.set_option('display.max_columns', None)

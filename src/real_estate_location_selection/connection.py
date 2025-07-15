@@ -1,5 +1,7 @@
-import psycopg
 import os
+
+import psycopg
+
 
 def local_db_connection():
     """

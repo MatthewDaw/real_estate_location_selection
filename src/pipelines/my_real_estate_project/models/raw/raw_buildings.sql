@@ -64,4 +64,4 @@ select
     management_company_new,
     building_name_new,
     building_website_new
-from {{ source('raw_data', 'hello_data_buildings_raw') }}
+from {{ source('raw_data', 'hello_data_buildings_raw') }} limit 1000

@@ -1,6 +1,6 @@
 import logging
-import time
 import os
+import time
 
 import requests
 from browserforge.headers import HeaderGenerator

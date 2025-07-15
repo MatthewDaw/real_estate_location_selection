@@ -1,9 +1,10 @@
-import time
-import random
-from typing import Any, Optional, Union, Iterator
-from google.cloud import bigquery
-from google.api_core.exceptions import BadRequest
 import logging
+import random
+import time
+from typing import Any, Optional
+
+from google.api_core.exceptions import BadRequest
+from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)
 

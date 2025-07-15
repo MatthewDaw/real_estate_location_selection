@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
-from real_estate_location_selection.connection import connection
-import pandas as pd
-import folium
-from folium.plugins import HeatMap
-import branca.colormap as cm
 import os
+
+import branca.colormap as cm
+import folium
+import pandas as pd
+from folium.plugins import HeatMap
+
+from real_estate_location_selection.connection import connection
 
 # ----------------------------------------
 # Configuration

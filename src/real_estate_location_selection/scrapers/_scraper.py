@@ -3,18 +3,17 @@ import gzip
 import io
 import json
 import logging
-import time
-import uuid
 import random
+import time
 from datetime import datetime, timezone
-from multiprocessing.pool import ThreadPool
 from typing import TypedDict, Union
 
-from google.cloud import bigquery, pubsub_v1
+from google.cloud import pubsub_v1
 from playwright.sync_api import Browser, BrowserContext, Page, Request, Route
 
-from real_estate_location_selection.scrapers.utils.session import Session
 from real_estate_location_selection.scrapers.utils.big_query_wrapper import create_client
+from real_estate_location_selection.scrapers.utils.session import Session
+
 
 class Task(TypedDict):
     source: str

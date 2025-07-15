@@ -3,18 +3,19 @@
 Script to download all data from BigQuery tables to local PostgreSQL instance.
 """
 
-import os
 import json
-import tempfile
 import logging
+import os
+import tempfile
 from typing import Dict, List, Any
+
 import psycopg2
 import psycopg2.extras
-from sqlalchemy import create_engine, text
-from google.cloud import bigquery_storage
-from google.cloud.bigquery_storage import types
 import pyarrow as pa
 import pyarrow.parquet as pq
+from google.cloud import bigquery_storage
+from google.cloud.bigquery_storage import types
+from sqlalchemy import create_engine, text
 
 # Set up logging
 logging.basicConfig(

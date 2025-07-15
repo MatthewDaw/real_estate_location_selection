@@ -1,5 +1,3 @@
-
-from camoufox.sync_api import Camoufox
 from real_estate_location_selection.scrapers.land_watch.land_watch_scraper import Landwatch
 from real_estate_location_selection.scrapers.utils.common_functions import get_browser
 

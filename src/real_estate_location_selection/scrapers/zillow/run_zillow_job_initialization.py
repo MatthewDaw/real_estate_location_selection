@@ -1,7 +1,6 @@
-
-from camoufox.sync_api import Camoufox
 from real_estate_location_selection.scrapers.zillow.zillow_scraper import Zillow
-from real_estate_location_selection.scrapers.utils.common_functions import get_browser
+from real_estate_location_selection.scrapers.zillow.zillow_scraper import Zillow
+
 
 def run_scraper():
     print("zillow scraper started")
