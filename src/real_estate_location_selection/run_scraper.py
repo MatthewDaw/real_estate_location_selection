@@ -75,7 +75,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
                   LIMIT @batch_size
                 )
                 """
-        print("pause")
+
         update_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("update_timestamp", "TIMESTAMP", unique_timestamp),
