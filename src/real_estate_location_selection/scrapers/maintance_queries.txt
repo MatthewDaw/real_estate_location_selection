@@ -223,3 +223,28 @@ LIMIT 5;
 
 
 
+-- remaining queued zillow jobs
+SELECT
+  COUNT(*) as total_jobs,
+  SUM(
+    CASE
+      WHEN scraped_at IS NOT NULL THEN 0
+      ELSE 1
+    END
+  ) as remaining_jobs
+FROM real_estate.zillow_urls
+where state in ('UT', 'ID', 'NV', 'AZ', 'CO', 'WY')
+-- 54776
+
+
+-- remaining queued landwatch jobs
+SELECT
+  COUNT(*) as total_jobs,
+  SUM(
+    CASE
+      WHEN scraped_at IS NOT NULL THEN 0
+      ELSE 1
+    END
+  ) as remaining_jobs
+FROM real_estate.landwatch_urls
+-- where state in ('UT', 'ID', 'NV', 'AZ', 'CO', 'WY')

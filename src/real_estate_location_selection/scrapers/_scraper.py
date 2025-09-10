@@ -250,7 +250,7 @@ class _Scraper:
                 # Direct all browser traffic through residential proxies
                 # currently at $0.50/GB.
                 proxy={
-                        "server": "core-residential.evomi.com:1000",
+                        "server": "premium-residential.evomi.com:1000",
                         "username": self.session.evomi_username,
                         "password": f"{self.session.evomi_pass}_country-US",
                     }
