@@ -1,0 +1,293 @@
+CREATE TABLE zillow_property_raw (
+    id VARCHAR NOT NULL,
+    source_url VARCHAR NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    status VARCHAR,
+    is_eligible_property BOOLEAN,
+    selling_soon JSONB,
+    last_sold_price FLOAT,
+    posting_url VARCHAR,
+    date_posted_string VARCHAR,
+    marketing_name VARCHAR,
+    posting_product_type VARCHAR,
+    lot_area_units VARCHAR,
+    lot_area_value FLOAT,
+    lot_size FLOAT,
+    living_area_units VARCHAR,
+    living_area FLOAT,
+    street_address VARCHAR,
+    city VARCHAR,
+    state VARCHAR,
+    zipcode VARCHAR,
+    price FLOAT,
+    currency VARCHAR,
+    home_type VARCHAR,
+    is_preforeclosure_auction BOOLEAN,
+    address JSONB,
+    bedrooms INTEGER,
+    bathrooms FLOAT,
+    year_built INTEGER,
+    living_area_units_short VARCHAR,
+    country VARCHAR,
+    monthly_hoa_fee FLOAT,
+    zestimate FLOAT,
+    new_construction_type VARCHAR,
+    zestimate_low_percent FLOAT,
+    zestimate_high_percent FLOAT,
+    time_on_zillow VARCHAR,
+    page_view_count INTEGER,
+    favorite_count INTEGER,
+    days_on_zillow INTEGER,
+    latitude FLOAT,
+    longitude FLOAT,
+    is_income_restricted BOOLEAN,
+    price_history JSONB,
+    most_recent_price FLOAT,
+    most_recent_price_date VARCHAR,
+    most_recent_price_change_rate FLOAT,
+    rental_application_accepted_type VARCHAR,
+    home_insights JSONB,
+    school_distances JSONB,
+    num_schools_close_to INTEGER,
+    avg_school_distance FLOAT,
+    risks JSONB,
+    description TEXT,
+    foreclosure JSONB,
+
+    -- Generated geography column
+    geog_point GEOGRAPHY GENERATED ALWAYS AS (ST_Point(longitude, latitude)::geography) STORED,
+
+    -- Primary key
+    PRIMARY KEY (source_url)
+);
+
+-- Create spatial index
+CREATE INDEX idx_zillow_property_raw_geog_point ON zillow_property_raw USING GIST (geog_point);
+
+
+
+CREATE TABLE landwatch_properties_raw (
+    id VARCHAR NOT NULL,
+    url VARCHAR NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    name VARCHAR,
+    property_type VARCHAR,
+    date_posted VARCHAR,
+    county VARCHAR,
+    lot_size FLOAT,
+    lot_size_units VARCHAR,
+    lot_type JSONB,
+    amenities JSONB,
+    mortgage_options JSONB,
+    activities JSONB,
+    lot_description JSONB,
+    geography JSONB,
+    road_frontage_desc JSONB,
+    state VARCHAR,
+    city VARCHAR,
+    zip VARCHAR,
+    address1 VARCHAR,
+    address2 VARCHAR,
+    latitude FLOAT,
+    longitude FLOAT,
+    city_latitude FLOAT,
+    city_longitude FLOAT,
+    acres FLOAT,
+    beds INTEGER,
+    baths INTEGER,
+    homesqft FLOAT,
+    property_types JSONB,
+    is_irrigated BOOLEAN,
+    is_residence BOOLEAN,
+    price FLOAT,
+    listing_date VARCHAR,
+    title VARCHAR,
+    description JSONB,
+    executive_summary TEXT,
+    is_diamond BOOLEAN,
+    is_gold BOOLEAN,
+    is_platinum BOOLEAN,
+    is_showcase BOOLEAN,
+    cost_per_acre FLOAT,
+    distance_to_city_miles FLOAT,
+    cost_per_homesqft FLOAT,
+
+    -- Generated geography column
+    geog_point GEOGRAPHY GENERATED ALWAYS AS (ST_Point(longitude, latitude)::geography) STORED,
+
+    -- Primary key
+    PRIMARY KEY (url)
+);
+
+-- Create spatial index
+CREATE INDEX idx_landwatch_properties_raw_geog_point ON landwatch_properties_raw USING GIST (geog_point);
+
+
+CREATE TABLE hello_data_buildings_raw (
+    id UUID NOT NULL,
+    street_address TEXT,
+    street_address_alias TEXT[],
+    city TEXT,
+    state TEXT,
+    zip_code TEXT,
+    lat NUMERIC,
+    lon NUMERIC,
+    msa TEXT,
+    building_name TEXT,
+    building_name_alias TEXT[],
+    building_phone_number TEXT,
+    building_website TEXT,
+    is_single_family BOOLEAN,
+    is_condo BOOLEAN,
+    is_apartment BOOLEAN,
+    number_units INTEGER,
+    year_built INTEGER,
+    number_stories INTEGER,
+    management_company TEXT,
+    specials TEXT,
+    cats_monthly_rent INTEGER,
+    cats_one_time_fee INTEGER,
+    cats_deposit INTEGER,
+    dogs_monthly_rent INTEGER,
+    dogs_one_time_fee INTEGER,
+    dogs_deposit INTEGER,
+    admin_fee INTEGER,
+    amenity_fee INTEGER,
+    application_fee INTEGER,
+    storage_fee INTEGER,
+    parking_covered INTEGER,
+    parking_garage INTEGER,
+    parking_surface_lot INTEGER,
+    listing_urls TEXT[],
+    created_on DATE,
+    image_gcs_file_names TEXT[],
+    lease_lengths TEXT,
+    min_deposit INTEGER,
+    max_deposit INTEGER,
+    verified_listing BOOLEAN,
+    walk_score INTEGER,
+    transit_score INTEGER,
+    bike_score INTEGER,
+    point GEOMETRY,
+    user_id TEXT,
+    avg_quality NUMERIC,
+    estimated_occupancy NUMERIC,
+    unit_mix_old NUMERIC[],
+    is_student BOOLEAN,
+    is_senior BOOLEAN,
+    point_v2 GEOGRAPHY,
+    latest_unit_source TEXT,
+    is_affordable BOOLEAN,
+    building_amenities TEXT[],
+    unit_amenities TEXT[],
+    is_lease_up BOOLEAN,
+    leased_percentage NUMERIC,
+    exposure_percentage NUMERIC,
+    google_place_id TEXT,
+    photo_url TEXT,
+    unit_mix NUMERIC[],
+    management_company_new TEXT,
+    building_name_new TEXT,
+    building_website_new TEXT,
+
+    -- Generated geography column
+    geog_point GEOGRAPHY GENERATED ALWAYS AS (ST_Point(lon, lat)::geography) STORED,
+
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX idx_hello_data_buildings_raw_geog_point ON hello_data_buildings_raw USING GIST (geog_point);
+
+
+
+CREATE TABLE hello_data_units_raw (
+    id UUID NOT NULL,
+    building_id UUID,
+    floorplan_name TEXT,
+    unit_name TEXT,
+    is_floorplan BOOLEAN,
+    availability DATE,
+    min_price INTEGER,
+    price INTEGER,
+    max_price INTEGER,
+    bed INTEGER,
+    bath INTEGER,
+    partial_bath INTEGER,
+    min_sqft INTEGER,
+    sqft INTEGER,
+    max_sqft INTEGER,
+    created_on DATE,
+    image_gcs_file_names TEXT[],
+    enter_market DATE,
+    exit_market DATE,
+    days_on_market INTEGER,
+    min_effective_price INTEGER,
+    effective_price INTEGER,
+    max_effective_price INTEGER,
+    floor INTEGER,
+    renovated BOOLEAN,
+    furnished BOOLEAN,
+    den BOOLEAN,
+    convertible BOOLEAN,
+    price_plans integer[],
+    amenities TEXT[],
+    tags TEXT[],
+    source TEXT,
+    deposit INTEGER,
+    lease_term INTEGER,
+    _data_pipeline_only_state TEXT,
+    source_id TEXT,
+
+    PRIMARY KEY (id)
+);
+
+-- Index for building_id
+CREATE INDEX idx_hello_data_units_raw_building_id ON hello_data_units_raw (building_id);
+
+CREATE TABLE hello_data_units_history_raw (
+    building_id uuid,
+    unit_id uuid,
+    min_price integer,
+    price integer,
+    max_price integer,
+    availability date,
+    from_date date,
+    to_date date,
+    min_effective_price integer,
+    effective_price integer,
+    max_effective_price integer,
+    period_id integer,
+    price_plans jsonb,
+    lease_term integer,
+    _data_pipeline_only_state text
+);
+
+-- Indexes for building_id, to_date, and from_date
+CREATE INDEX idx_hello_data_units_history_raw_building_id ON hello_data_units_history_raw (building_id);
+CREATE INDEX idx_hello_data_units_history_raw_to_date ON hello_data_units_history_raw (to_date);
+CREATE INDEX idx_hello_data_units_history_raw_from_date ON hello_data_units_history_raw (from_date);
+
+-- Composite index for date range queries (optional but often useful)
+CREATE INDEX idx_hello_data_units_history_raw_building_dates ON hello_data_units_history_raw (building_id, from_date, to_date);
+
+
+
+CREATE TABLE landwatch_urls (
+    url VARCHAR NOT NULL,
+    state VARCHAR NOT NULL,
+    scraped_at DATE,
+    created_at TIMESTAMP NOT NULL,
+    last_pulled TIMESTAMP,
+    processing_id VARCHAR
+);
+
+
+CREATE TABLE zillow_urls (
+    url VARCHAR NOT NULL,
+    state VARCHAR NOT NULL,
+    type VARCHAR NOT NULL,
+    scraped_at DATE,
+    created_at TIMESTAMP NOT NULL,
+    last_pulled TIMESTAMP,
+    processing_id VARCHAR
+);

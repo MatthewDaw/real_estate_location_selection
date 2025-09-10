@@ -1,0 +1,41 @@
+-- drop_all.sql - Drop all dbt objects
+-- Run this SQL script in your database to clean everything up
+
+-- Drop main tables (materialized as table)
+DROP TABLE IF EXISTS building_analysis CASCADE;
+DROP TABLE IF EXISTS closest_buildings_lookup CASCADE;
+DROP TABLE IF EXISTS smoothed_values CASCADE;
+DROP TABLE IF EXISTS zillow_analysis CASCADE;
+DROP TABLE IF EXISTS empty_lots;
+
+-- Drop staging views
+DROP VIEW IF EXISTS stg_zillow CASCADE;
+DROP VIEW IF EXISTS stg_landwatch CASCADE;
+DROP VIEW IF EXISTS stg_buildings CASCADE;
+DROP VIEW IF EXISTS stg_units CASCADE;
+DROP VIEW IF EXISTS raw_buildings CASCADE;
+DROP VIEW IF EXISTS raw_units CASCADE;
+DROP VIEW IF EXISTS raw_units_history CASCADE;
+
+-- Drop raw models
+DROP VIEW IF EXISTS raw_zillow CASCADE;
+DROP VIEW IF EXISTS raw_landwatch CASCADE;
+
+-- Drop units history
+DROP VIEW IF EXISTS units_history_grouped_by_building CASCADE;
+DROP VIEW IF EXISTS units_history CASCADE;
+
+-- Drop building summaries
+DROP VIEW IF EXISTS hd_building_summary CASCADE;
+DROP VIEW IF EXISTS zillow_building_summary CASCADE;
+
+-- Drop points of study
+DROP VIEW IF EXISTS points_of_interest CASCADE;
+DROP TABLE IF EXISTS developed_properties CASCADE;
+
+-- Drop any other tables you might have
+DROP VIEW IF EXISTS dim_buildings CASCADE;
+DROP VIEW IF EXISTS fact_units CASCADE;
+DROP VIEW IF EXISTS mart_properties CASCADE;
+
+SELECT 'All dbt objects dropped!' as result;

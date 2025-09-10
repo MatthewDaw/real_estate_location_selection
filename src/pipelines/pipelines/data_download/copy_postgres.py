@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Script to copy all data from the 'buildings', 'units', and 'units_history' tables from one PostgreSQL instance to another.
+Script to copy all data from the 'buildings', 'units', and '04_units_history' tables from one PostgreSQL instance to another.
 """
 
 import logging
@@ -30,8 +30,8 @@ TABLE_CONFIGS = {
         'order_column': 'id',
         'special_columns': []
     },
-    'units_history': {
-        'source_table': 'units_history',
+    '04_units_history': {
+        'source_table': '04_units_history',
         'dest_table': 'hello_data_units_history_raw',
         'state_column': '_data_pipeline_only_state',
         'order_column': 'building_id',
@@ -71,8 +71,8 @@ def copy_state_data(state: str, source_conn, dest_conn, table_config: dict, colu
     columns_str = ', '.join([f'"{col}"' for col in columns])
     placeholders = ', '.join(['%s'] * len(columns))
 
-    # Different conflict resolution for units_history (no unique id column)
-    if source_table == 'units_history':
+    # Different conflict resolution for 04_units_history (no unique id column)
+    if source_table == '04_units_history':
         insert_query = f"""
             INSERT INTO {dest_table} ({columns_str})
             VALUES ({placeholders})
@@ -192,6 +192,7 @@ def copy_table_data(table_key: str, source_conn, dest_conn, states: list) -> dic
             total_copied += copied_rows
             successful_states.append((state, copied_rows))
             logger.info(f"Completed {source_table} - {state}: {copied_rows} rows copied")
+            dest_conn.commit()
         except Exception as e:
             logger.error(f"Failed to copy {source_table} data for state {state}: {e}")
             failed_states.append(state)
@@ -230,7 +231,7 @@ def copy_all_tables():
         table_results = {}
 
         for table_key in TABLE_CONFIGS.keys():
-            if table_key != 'units_history':
+            if table_key == '04_units_history':
                 logger.info("=" * 60)
                 logger.info(f"PROCESSING TABLE: {table_key.upper()}")
                 logger.info("=" * 60)
@@ -278,7 +279,7 @@ def copy_all_tables():
 
 def main():
     """Main function."""
-    logger.info("Starting buildings, units, and units_history table copy...")
+    logger.info("Starting buildings, units, and 04_units_history table copy...")
     success = copy_all_tables()
 
     if success:

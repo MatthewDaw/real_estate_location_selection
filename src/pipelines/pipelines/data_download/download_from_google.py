@@ -3,6 +3,10 @@
 Script to download all data from BigQuery tables to local PostgreSQL instance.
 """
 
+
+from dotenv import load_dotenv
+load_dotenv('../../../../.env')
+
 import json
 import logging
 import os
@@ -26,20 +30,34 @@ logger = logging.getLogger(__name__)
 
 # Table configurations
 TABLE_CONFIGS = {
-    'landwatch_properties_raw': {
-        'bigquery_table': 'projects/flowing-flame-464314-j5/datasets/real_estate/tables/landwatch_properties',
-        'postgres_table': 'landwatch_properties_raw',
+
+    "zillow_urls":{
+        'bigquery_table': 'projects/flowing-flame-464314-j5/datasets/real_estate/tables/zillow_urls',
+        'postgres_table': 'zillow_urls',
         'dedup_column': 'url',
-        'json_columns': ['lot_type', 'amenities', 'mortgage_options', 'activities', 'lot_description',
-                         'geography', 'road_frontage_desc', 'property_types', 'description', 'foreclosure']
+        'json_columns': []
     },
-    'zillow_property_raw': {
-        'bigquery_table': 'projects/flowing-flame-464314-j5/datasets/real_estate/tables/zillow_property_details',
-        'postgres_table': 'zillow_property_raw',
-        'dedup_column': 'source_url',
-        'json_columns': ['selling_soon', 'address', 'price_history', 'home_insights', 'school_distances',
-                         'risks', 'foreclosure']
-    }
+    'landwatch_urls':{
+        'bigquery_table': 'projects/flowing-flame-464314-j5/datasets/real_estate/tables/landwatch_urls',
+        'postgres_table': 'landwatch_urls',
+        'dedup_column': 'url',
+        'json_columns': []
+    },
+    # 'landwatch_properties_raw': {
+    #     'bigquery_table': 'projects/flowing-flame-464314-j5/datasets/real_estate/tables/landwatch_properties',
+    #     'postgres_table': 'landwatch_properties_raw',
+    #     'dedup_column': 'url',
+    #     'json_columns': ['lot_type', 'amenities', 'mortgage_options', 'activities', 'lot_description',
+    #                      'geography', 'road_frontage_desc', 'property_types', 'description', 'foreclosure']
+    # },
+    # 'zillow_property_raw': {
+    #     'bigquery_table': 'projects/flowing-flame-464314-j5/datasets/real_estate/tables/zillow_property_details',
+    #     'postgres_table': 'zillow_property_raw',
+    #     'dedup_column': 'source_url',
+    #     'json_columns': ['selling_soon', 'address', 'price_history', 'home_insights', 'school_distances',
+    #                      'risks', 'foreclosure']
+    # },
+
 }
 
 
@@ -143,7 +161,7 @@ def upload_parquet_to_postgres(parquet_file: str, table_name: str, dedup_column:
 
     try:
         with engine.begin() as conn:
-            # Truncate existing data using raw SQL
+            # Truncate existing data using 01_raw SQL
             logger.info(f"Truncating table {table_name}")
             conn.execute(text(f"TRUNCATE TABLE {table_name} CASCADE"))
 

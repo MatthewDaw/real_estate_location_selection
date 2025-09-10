@@ -515,7 +515,7 @@ class Landwatch(_Scraper):
 
         Args:
             soup (BeautifulSoup): The parsed HTML document.
-            page_source (str): The raw HTML string.
+            page_source (str): The 01_raw HTML string.
 
         Returns:
             tuple: (lot_size: str | None, lot_types: List[str], additional_details: dict)

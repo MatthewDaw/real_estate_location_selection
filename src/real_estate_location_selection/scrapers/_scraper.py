@@ -89,7 +89,7 @@ class _Scraper:
     def _get_shuffled_valid_tasks(self):
         """Every day, we want to process the urls in a random order to limit
         any sort of traffic patterns. Since we are loading the tasks into a
-        staging BigQuery table, we randomize them on query.
+        03_staging BigQuery table, we randomize them on query.
         """
         query = f"""
             SELECT

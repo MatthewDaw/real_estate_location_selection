@@ -1,0 +1,500 @@
+# models/01_raw/schema.yml
+version: 2
+
+models:
+  - name: raw_buildings
+    description: >
+      Filtered and cleaned building data for Utah properties from Hello Data.
+      Serves as the foundation for all building-related analysis by providing 
+      comprehensive building characteristics, location data, and amenity information.
+      Only includes properties in Utah state.
+    columns:
+      - name: id
+        description: "Unique building identifier from Hello Data"
+      - name: street_address
+        description: "Physical street address of the building"
+      - name: street_address_alias
+        description: "Alternative format or alias for the street address"
+      - name: city
+        description: "City where the building is located"
+      - name: state
+        description: "State abbreviation (filtered to 'UT' only)"
+      - name: zip_code
+        description: "ZIP/postal code for the building location"
+      - name: lat
+        description: "Latitude coordinate of the building"
+      - name: lon
+        description: "Longitude coordinate of the building"
+      - name: msa
+        description: "Metropolitan Statistical Area identifier"
+      - name: building_name
+        description: "Primary name of the building or property"
+      - name: building_name_alias
+        description: "Alternative or marketing name for the building"
+      - name: building_phone_number
+        description: "Contact phone number for the building"
+      - name: building_website
+        description: "Website URL for the building or property"
+      - name: is_single_family
+        description: "Boolean flag indicating if property is single family home"
+      - name: is_condo
+        description: "Boolean flag indicating if property is a condominium"
+      - name: is_apartment
+        description: "Boolean flag indicating if property is an apartment building"
+      - name: number_units
+        description: "Total number of rental units in the building"
+      - name: year_built
+        description: "Year the building was constructed"
+      - name: number_stories
+        description: "Number of floors/stories in the building"
+      - name: management_company
+        description: "Property management company name"
+      - name: specials
+        description: "Current promotions, deals, or specials offered"
+      - name: cats_monthly_rent
+        description: "Monthly pet rent charge for cats"
+      - name: cats_one_time_fee
+        description: "One-time fee for cats"
+      - name: cats_deposit
+        description: "Refundable deposit required for cats"
+      - name: dogs_monthly_rent
+        description: "Monthly pet rent charge for dogs"
+      - name: dogs_one_time_fee
+        description: "One-time fee for dogs"
+      - name: dogs_deposit
+        description: "Refundable deposit required for dogs"
+      - name: admin_fee
+        description: "Administrative fee charged to tenants"
+      - name: amenity_fee
+        description: "Monthly fee for building amenities"
+      - name: application_fee
+        description: "Fee charged for rental applications"
+      - name: storage_fee
+        description: "Monthly fee for storage units"
+      - name: parking_covered
+        description: "Information about covered parking availability"
+      - name: parking_garage
+        description: "Information about garage parking availability"
+      - name: parking_surface_lot
+        description: "Information about surface lot parking availability"
+      - name: listing_urls
+        description: "URLs to external listing pages"
+      - name: created_on
+        description: "Timestamp when the record was created"
+      - name: image_gcs_file_names
+        description: "Google Cloud Storage filenames for building images"
+      - name: lease_lengths
+        description: "Available lease term options"
+      - name: min_deposit
+        description: "Minimum security deposit required"
+      - name: max_deposit
+        description: "Maximum security deposit required"
+      - name: verified_listing
+        description: "Boolean flag indicating if listing has been verified"
+      - name: walk_score
+        description: "Walk Score rating (0-100) for walkability"
+      - name: transit_score
+        description: "Transit Score rating (0-100) for public transportation"
+      - name: bike_score
+        description: "Bike Score rating (0-100) for bike-friendliness"
+      - name: point
+        description: "Geographic point data (legacy format)"
+      - name: user_id
+        description: "User identifier from the data source system"
+      - name: avg_quality
+        description: "Average quality rating for the building"
+      - name: estimated_occupancy
+        description: "Estimated occupancy percentage"
+      - name: unit_mix_old
+        description: "Legacy unit mix information"
+      - name: is_student
+        description: "Boolean flag indicating if property targets students"
+      - name: is_senior
+        description: "Boolean flag indicating if property is senior housing"
+      - name: point_v2
+        description: "Updated geographic point data format"
+      - name: latest_unit_source
+        description: "Most recent data source for unit information"
+      - name: is_affordable
+        description: "Boolean flag indicating if property offers affordable housing"
+      - name: building_amenities
+        description: "JSON or text field listing building amenities"
+      - name: unit_amenities
+        description: "JSON or text field listing unit amenities"
+      - name: is_lease_up
+        description: "Boolean flag indicating if property is in lease-up phase"
+      - name: leased_percentage
+        description: "Percentage of units currently leased"
+      - name: exposure_percentage
+        description: "Marketing exposure percentage"
+      - name: google_place_id
+        description: "Google Places API identifier for the location"
+      - name: photo_url
+        description: "URL to primary photo of the building"
+      - name: unit_mix
+        description: "Current unit mix information"
+      - name: management_company_new
+        description: "Updated management company information"
+      - name: building_name_new
+        description: "Updated building name information"
+      - name: building_website_new
+        description: "Updated website URL"
+      - name: geog_point
+        description: "PostGIS geography point for spatial queries"
+
+  - name: raw_landwatch
+    description: >
+      Deduplicated and filtered Landwatch property listings for Utah.
+      Provides clean land sale data focusing on properties within reasonable 
+      price ranges ($10K-$800K) with complete location information.
+      Records are deduplicated by URL keeping the most recent entry.
+    columns:
+      - name: id
+        description: "Unique property identifier from Landwatch"
+      - name: url
+        description: "Listing URL (used for deduplication)"
+      - name: created_at
+        description: "Timestamp when record was created in our system"
+      - name: name
+        description: "Property name or title from the listing"
+      - name: property_type
+        description: "Type/category of the property"
+      - name: date_posted
+        description: "Original posting date on Landwatch"
+      - name: county
+        description: "County where the property is located"
+      - name: lot_size
+        description: "Size of the lot (numeric value)"
+      - name: lot_size_units
+        description: "Units for lot size measurement (acres, sq ft, etc.)"
+      - name: lot_type
+        description: "Classification or type of lot"
+      - name: amenities
+        description: "Available amenities and features"
+      - name: mortgage_options
+        description: "Available financing or mortgage options"
+      - name: activities
+        description: "Recreational activities available on or near property"
+      - name: lot_description
+        description: "Detailed description of the lot"
+      - name: geography
+        description: "Geographic features and characteristics"
+      - name: road_frontage_desc
+        description: "Description of road access and frontage"
+      - name: state
+        description: "State abbreviation (filtered to 'UT' only)"
+      - name: city
+        description: "City where the property is located"
+      - name: zip
+        description: "ZIP/postal code"
+      - name: address1
+        description: "Primary address line"
+      - name: address2
+        description: "Secondary address line (apt, suite, etc.)"
+      - name: latitude
+        description: "Latitude coordinate of the property"
+      - name: longitude
+        description: "Longitude coordinate of the property"
+      - name: city_latitude
+        description: "Latitude coordinate of the city center"
+      - name: city_longitude
+        description: "Longitude coordinate of the city center"
+      - name: acres
+        description: "Lot size converted to acres"
+      - name: beds
+        description: "Number of bedrooms (if property includes residence)"
+      - name: baths
+        description: "Number of bathrooms (if property includes residence)"
+      - name: homesqft
+        description: "Square footage of home (if property includes residence)"
+      - name: property_types
+        description: "Additional property type classifications"
+      - name: is_irrigated
+        description: "Boolean flag indicating if property has irrigation"
+      - name: is_residence
+        description: "Boolean flag indicating if property includes a residence"
+      - name: price
+        description: "Listed price of the property"
+      - name: listing_date
+        description: "Date when property was listed"
+      - name: title
+        description: "Marketing title of the listing"
+      - name: description
+        description: "Full property description"
+      - name: executive_summary
+        description: "Executive summary of the property"
+      - name: is_diamond
+        description: "Boolean flag for Diamond tier listing"
+      - name: is_gold
+        description: "Boolean flag for Gold tier listing"
+      - name: is_platinum
+        description: "Boolean flag for Platinum tier listing"
+      - name: is_showcase
+        description: "Boolean flag for Showcase tier listing"
+      - name: cost_per_acre
+        description: "Calculated cost per acre"
+      - name: distance_to_city_miles
+        description: "Distance from property to city center in miles"
+      - name: cost_per_homesqft
+        description: "Calculated cost per square foot of home"
+      - name: geog_point
+        description: "PostGIS geography point for spatial queries"
+
+  - name: raw_units
+    description: >
+      Unit-level data for buildings in the Utah dataset from Hello Data.
+      Provides detailed unit information including pricing, specifications, 
+      and availability. Only includes units from buildings in our Utah buildings dataset.
+    columns:
+      - name: id
+        description: "Unique unit identifier from Hello Data"
+      - name: building_id
+        description: "Foreign key reference to building in raw_buildings"
+      - name: floorplan_name
+        description: "Name/identifier of the floorplan type"
+      - name: unit_name
+        description: "Specific unit identifier (e.g., '2A', 'Unit 205')"
+      - name: is_floorplan
+        description: "Boolean flag indicating if record represents a floorplan template vs specific unit"
+      - name: availability
+        description: "Current availability status of the unit"
+      - name: min_price
+        description: "Minimum price for this unit/floorplan"
+      - name: price
+        description: "Current or typical price"
+      - name: max_price
+        description: "Maximum price for this unit/floorplan"
+      - name: bed
+        description: "Number of bedrooms"
+      - name: bath
+        description: "Number of full bathrooms"
+      - name: partial_bath
+        description: "Number of partial/half bathrooms"
+      - name: min_sqft
+        description: "Minimum square footage"
+      - name: sqft
+        description: "Square footage of the unit"
+      - name: max_sqft
+        description: "Maximum square footage"
+      - name: created_on
+        description: "Timestamp when record was created"
+      - name: image_gcs_file_names
+        description: "Google Cloud Storage filenames for unit images"
+      - name: enter_market
+        description: "Date when unit entered the market"
+      - name: exit_market
+        description: "Date when unit exited the market"
+      - name: days_on_market
+        description: "Number of days unit has been on market"
+      - name: min_effective_price
+        description: "Minimum effective price after concessions"
+      - name: effective_price
+        description: "Effective price after concessions and specials"
+      - name: max_effective_price
+        description: "Maximum effective price after concessions"
+      - name: floor
+        description: "Floor level where unit is located"
+      - name: renovated
+        description: "Boolean flag or description of renovation status"
+      - name: furnished
+        description: "Boolean flag indicating if unit comes furnished"
+      - name: den
+        description: "Boolean flag indicating if unit has a den"
+      - name: convertible
+        description: "Boolean flag indicating if unit is convertible layout"
+      - name: price_plans
+        description: "Available pricing plans or payment options"
+      - name: amenities
+        description: "Unit-specific amenities and features"
+      - name: tags
+        description: "Additional categorization tags"
+      - name: source
+        description: "Data source identifier"
+      - name: deposit
+        description: "Required security deposit amount"
+      - name: lease_term
+        description: "Available lease term options"
+      - name: state
+        description: "State identifier (data pipeline field)"
+      - name: source_id
+        description: "External source system identifier"
+
+  - name: raw_units_history
+    description: >
+      Historical pricing and availability data for units in Utah buildings.
+      Time-series data tracking price changes, availability periods, 
+      and effective pricing with concessions over time.
+    columns:
+      - name: building_id
+        description: "Foreign key reference to building"
+      - name: unit_id
+        description: "Foreign key reference to unit"
+      - name: min_price
+        description: "Minimum price during this period"
+      - name: price
+        description: "Price during this period"
+      - name: max_price
+        description: "Maximum price during this period"
+      - name: availability
+        description: "Availability status during this period"
+      - name: from_date
+        description: "Start date for this pricing/availability period"
+      - name: to_date
+        description: "End date for this pricing/availability period"
+      - name: min_effective_price
+        description: "Minimum effective price after concessions"
+      - name: effective_price
+        description: "Effective price after concessions and specials"
+      - name: max_effective_price
+        description: "Maximum effective price after concessions"
+      - name: period_id
+        description: "Identifier for the time period"
+      - name: price_plans
+        description: "Available pricing plans during this period"
+      - name: lease_term
+        description: "Lease terms available during this period"
+      - name: _data_pipeline_only_state
+        description: "State identifier (data pipeline internal field)"
+
+  - name: raw_zillow
+    description: >
+      Deduplicated and filtered Zillow property listings for Utah.
+      For-sale property data including listing details, pricing, and market metrics.
+      Filtered to Utah properties priced between $10K-$800K, excluding sold properties
+      and Canadian listings. Deduplicated by source URL keeping most recent record.
+    columns:
+      - name: id
+        description: "Unique property identifier from Zillow"
+      - name: source_url
+        description: "Zillow listing URL (used for deduplication)"
+      - name: created_at
+        description: "Timestamp when record was created in our system"
+      - name: status
+        description: "Current listing status (excludes 'SOLD' and 'FOR_RENT')"
+      - name: is_eligible_property
+        description: "Boolean flag indicating property eligibility"
+      - name: selling_soon
+        description: "Boolean flag indicating if property is selling soon"
+      - name: last_sold_price
+        description: "Price when property was last sold"
+      - name: posting_url
+        description: "URL to the property posting"
+      - name: date_posted_string
+        description: "Date posted as string"
+      - name: marketing_name
+        description: "Marketing name for the property"
+      - name: posting_product_type
+        description: "Type of posting/product on Zillow"
+      - name: lot_area_units
+        description: "Units for lot area measurement"
+      - name: lot_area_value
+        description: "Numeric value of lot area"
+      - name: lot_size
+        description: "Total lot size"
+      - name: living_area_units
+        description: "Units for living area measurement"
+      - name: living_area
+        description: "Living area square footage"
+      - name: street_address
+        description: "Street address of the property"
+      - name: city
+        description: "City where property is located"
+      - name: state
+        description: "State abbreviation (filtered to 'UT' only)"
+      - name: zipcode
+        description: "ZIP/postal code"
+      - name: price
+        description: "Current listing price"
+      - name: currency
+        description: "Currency for price (typically USD)"
+      - name: home_type
+        description: "Type of home (house, condo, townhome, etc.)"
+      - name: is_preforeclosure_auction
+        description: "Boolean flag for pre-foreclosure auction properties"
+      - name: address
+        description: "Full formatted address"
+      - name: bedrooms
+        description: "Number of bedrooms"
+      - name: bathrooms
+        description: "Number of bathrooms"
+      - name: year_built
+        description: "Year the property was built"
+      - name: living_area_units_short
+        description: "Abbreviated units for living area"
+      - name: country
+        description: "Country (excludes 'CAN' per filters)"
+      - name: monthly_hoa_fee
+        description: "Monthly homeowners association fee"
+      - name: zestimate
+        description: "Zillow's automated property value estimate"
+      - name: new_construction_type
+        description: "Type of new construction if applicable"
+      - name: zestimate_low_percent
+        description: "Lower bound of Zestimate range as percentage"
+      - name: zestimate_high_percent
+        description: "Upper bound of Zestimate range as percentage"
+      - name: time_on_zillow
+        description: "Time property has been listed on Zillow"
+      - name: page_view_count
+        description: "Number of page views for the listing"
+      - name: favorite_count
+        description: "Number of users who favorited the listing"
+      - name: days_on_zillow
+        description: "Number of days property has been on Zillow"
+      - name: latitude
+        description: "Latitude coordinate"
+      - name: longitude
+        description: "Longitude coordinate"
+      - name: is_income_restricted
+        description: "Boolean flag for income-restricted properties"
+      - name: price_history
+        description: "Historical pricing information"
+      - name: most_recent_price
+        description: "Most recent price from price history"
+      - name: most_recent_price_date
+        description: "Date of most recent price change"
+      - name: most_recent_price_change_rate
+        description: "Rate of most recent price change"
+      - name: rental_application_accepted_type
+        description: "Type of rental applications accepted"
+      - name: home_insights
+        description: "Additional insights about the home"
+      - name: school_distances
+        description: "Information about nearby schools and distances"
+      - name: num_schools_close_to
+        description: "Number of schools in proximity"
+      - name: avg_school_distance
+        description: "Average distance to nearby schools"
+      - name: risks
+        description: "Property or area risk information"
+      - name: description
+        description: "Property description from listing"
+      - name: foreclosure
+        description: "Foreclosure status information"
+      - name: geog_point
+        description: "PostGIS geography point for spatial queries"
+
+  - name: raw_manual_collected_properties
+    description: >
+      Manually collected property data including address, coordinates,
+      bedroom/bathroom counts, square footage, cost, and listing URLs
+      for properties across various Utah locations.
+    columns:
+      - name: address
+        description: "Full property address"
+      - name: lat
+        description: "Latitude coordinate"
+      - name: lon
+        description: "Longitude coordinate"
+      - name: bed
+        description: "Number of bedrooms"
+      - name: bath
+        description: "Number of bathrooms"
+      - name: sqft
+        description: "Property square footage"
+      - name: cost
+        description: "Property cost/price"
+      - name: url
+        description: "Property listing URL"
+      - name: row_num
+        description: "Row number for deduplication purposes"

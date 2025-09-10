@@ -1,0 +1,112 @@
+# models/properties.yml
+version: 2
+
+models:
+  - name: dim_properties
+    description: >
+      {{ doc("dim_properties_overview") }}
+      
+      Dimensional table combining building and unit information to provide
+      a comprehensive view of property characteristics across the Utah market.
+      This table serves as the foundation for property-level analysis and reporting.
+    docs:
+      show: true
+    meta:
+      owner: "analytics_team"
+      data_domain: "real_estate"
+      update_frequency: "daily"
+      primary_use_cases:
+        - "Property portfolio analysis"
+        - "Market research and comparison"
+        - "Location-based analytics"
+      data_classification: "internal"
+    columns:
+      - name: id
+        description: >
+          {{ doc("building_id_definition") }}
+          
+          Unique building identifier that serves as the primary key.
+          This ID is consistent across all Hello Data sources and 
+          can be used to join with unit-level data.
+        data_tests:
+          - unique:
+              config:
+                severity: error
+          - not_null:
+              config:
+                severity: error
+        meta:
+          dimension_type: "primary_key"
+          data_source: "hello_data"
+
+      - name: total_units
+        description: >
+          {{ doc("total_units_definition") }}
+          
+          Total number of rental units in the building. This includes
+          all unit types (studios, 1BR, 2BR, etc.) and represents the
+          maximum capacity of the building for rental income.
+        data_tests:
+          - not_null:
+              config:
+                severity: error
+          - dbt_utils.accepted_range:
+              min_value: 1
+              max_value: 1000
+              config:
+                severity: warn
+        meta:
+          dimension_type: "measure"
+          unit_of_measure: "count"
+          business_definition: "Total rentable units per building"
+
+# Additional documentation blocks
+docs:
+  dim_properties_overview: |
+    # Property Dimension Table
+    
+    The `dim_properties` table is a core dimensional table that provides a unified view 
+    of building and property characteristics across the Utah real estate market.
+    
+    ## Key Features
+    - Combines building metadata with unit aggregations
+    - Provides geographic and demographic context
+    - Supports property comparison and analysis
+    - Optimized for reporting and dashboard queries
+    
+    ## Data Lineage
+    - **Primary Source**: Hello Data Buildings API
+    - **Refresh Frequency**: Daily at 6 AM UTC
+    - **Retention Policy**: Full historical data retained
+    
+    ## Usage Guidelines
+    - Use for property-level analysis and reporting
+    - Join with unit tables for detailed analysis
+    - Filter by geography for market-specific insights
+    
+    ## Related Tables
+    - `raw_buildings` - Source building data
+    - `raw_units` - Unit-level details
+    - `staging_buildings` - Cleaned building data
+
+  building_id_definition: |
+    ## Building ID Definition
+    
+    The building ID is a unique identifier assigned by Hello Data to each property
+    in their system. This ID:
+    
+    - Remains consistent across time
+    - Links buildings to their units
+    - Serves as the primary key for building-related tables
+    - Format: Alphanumeric string (e.g., "BLD_12345")
+
+  total_units_definition: |
+    ## Total Units Definition
+    
+    Total units represents the complete count of individual rental units within
+    a building, including:
+    
+    - **Included**: Studios, 1BR, 2BR, 3BR+, lofts, penthouses
+    - **Excluded**: Retail spaces, storage units, parking spaces
+    - **Source**: Hello Data building metadata
+    - **Validation**: Cross-checked against unit-level records
