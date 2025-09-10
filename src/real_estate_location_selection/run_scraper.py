@@ -94,7 +94,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
 
         # sleep for a couple seconds so that if multiple threads updated this at the same time, the new process id
         # will be updated and we avoid pulling that job here
-        time.sleep(5)
+        time.sleep(2)
 
         # Step 2: Get URLs that THIS process actually claimed
         select_query = f"""

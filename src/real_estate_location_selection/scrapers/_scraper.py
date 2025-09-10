@@ -40,10 +40,6 @@ class _Scraper:
         if self.source is None:
             raise Exception("Assign a source name")
         self.session = Session()
-        self.pubsub_client = pubsub_v1.PublisherClient()
-        self.topic_path = self.pubsub_client.topic_path(
-            "flowing-flame-464314-j5", topic_id
-        )
         self.now = datetime.now(timezone.utc).date().isoformat()
         self._browser = browser
         self.default_timeout = default_timeout
@@ -111,21 +107,6 @@ class _Scraper:
                     }
                 )
         return valid_tasks
-
-    def send_task(self, task: Task):
-        """Send the task to Pub/Sub. Wrap in an infinite loop because sometimes
-        Google can fail us and we want to infinitely try until it works.
-        """
-        while True:
-            try:
-                self.pubsub_client.publish(
-                    self.topic_path,
-                    data=json.dumps(task).encode("utf-8"),
-                    source=task["source"],
-                ).result()
-                return
-            except Exception:
-                pass
 
     def prepare_tasks(self) -> list[tuple[str, str]]:
         """Return a list of urls. these will be published to a Cloud Pub/Sub
@@ -261,18 +242,22 @@ class _Scraper:
                 if "Target page, context or browser has been closed" in str(e):
                     raise e
 
+
+
     def _get_page(self) -> Page:
         if not self._page:
             if self.use_proxies_camoufox:
                 # Direct all browser traffic through residential proxies
                 # currently at $0.50/GB.
-                self._context = self._browser.new_context(
-                    ignore_https_errors=True,
-                    proxy={
+                proxy={
                         "server": "core-residential.evomi.com:1000",
                         "username": self.session.evomi_username,
                         "password": f"{self.session.evomi_pass}_country-US",
-                    },
+                    }
+
+                self._context = self._browser.new_context(
+                    ignore_https_errors=True,
+                    proxy=proxy
                 )
             else:
                 self._context = self._browser.new_context()
@@ -293,6 +278,7 @@ class _Scraper:
                     return self._get_page()
             self._page = page
         return self._page
+
 
     def block_unwanted_requests(self, route: Route, request: Request):
         """Intercept all requests made by the browser and only let document
