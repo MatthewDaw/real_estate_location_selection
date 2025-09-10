@@ -28,7 +28,7 @@ jobs:
             - name: 'gcr.io/kaniko-project/executor:latest'
               args:
                 - --dockerfile=Dockerfile
-                - --destination=us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest
+                - --destination=us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/real-estate-scraping:latest
                 - --cache=true
                 - --cache-repo=us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/cache
                 - --context=dir://.

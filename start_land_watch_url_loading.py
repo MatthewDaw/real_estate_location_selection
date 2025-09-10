@@ -23,7 +23,7 @@ request = batch_v1.CreateJobRequest(
                     runnables=[
                         batch_v1.Runnable(
                             container=batch_v1.Runnable.Container(
-                                image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/zillow-scraper:latest",
+                                image_uri="us-west3-docker.pkg.dev/flowing-flame-464314-j5/real-estate-location-selection/real-estate-scraping:latest",
                                 entrypoint="sh",
                                 commands=[
                                     "-c",
