@@ -63,13 +63,13 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
                     FROM `{source_table}` 
                     WHERE state IN ('{states_str}')
                     -- Only include URLs where ALL rows have scraped_at IS NULL and not pulled in last 5 hours
-                    AND (url NOT IN (
+                    AND url NOT IN (
                       SELECT DISTINCT url 
                       FROM `{source_table}` 
                       WHERE scraped_at IS NOT NULL
                       OR 
                       last_pulled > TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 5 HOUR)
-                    ) or true)
+                    )
                   ) filtered
                   ORDER BY RAND()
                   LIMIT @batch_size
@@ -102,7 +102,7 @@ def pull_from_queue(scraper_source: str, batch_size: int, process_id: str) -> Li
         FROM `{source_table}`
         WHERE last_pulled = @update_timestamp 
         AND processing_id = @process_id
-        AND (scraped_at IS NULL or true)
+        AND scraped_at IS NULL
         ORDER BY url
         """
 
