@@ -139,6 +139,7 @@ def run(scraper_source, batch_size, browser):
     error_count = 0
     retry_count = 0
     while retry_count < 5:
+        retry_count += 1
         for urls in pull_from_queue(scraper_source, batch_size, process_id):
             if urls:
                 retry_count = 0

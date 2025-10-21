@@ -24,7 +24,7 @@ class Landwatch(_Scraper):
     use_resource_intercept = False
 
     def __init__(self, browser, states_to_scrape):
-        super().__init__(browser, "landwatch-job-queue")
+        super().__init__(browser)
         self.states_to_scrape = states_to_scrape
         self._ensure_tables_exist()
         self.num_processed = 0
