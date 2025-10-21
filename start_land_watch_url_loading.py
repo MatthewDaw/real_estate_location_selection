@@ -27,7 +27,7 @@ request = batch_v1.CreateJobRequest(
                                 entrypoint="sh",
                                 commands=[
                                     "-c",
-                                    "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && exec uv run real_estate_location_selection/scrapers/land_watch/run_land_watch_job_initialization.py"
+                                    "Xvfb :99 -screen 0 1280x720x24 > /dev/null 2>&1 & sleep 2 && export DISPLAY=:99 && exec uv run scrapers/scrapers_logic/land_watch/run_land_watch_job_initialization.py"
                                 ]
                             ),
                             environment=batch_v1.Environment(

@@ -1,0 +1,152 @@
+# dbt_project.yml
+
+name: 'real_estate_dbt'
+version: '1.0.0'
+config-version: 2
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'my_real_estate_project'
+
+# These configurations specify where dbt should look for different types of files.
+# The `model-paths` config, for example, states that models in this project can be
+# found in the "models/" directory. You probably won't need to change these!
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+
+# Configures which files to clean when running `dbt clean`
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Variables for the project
+vars:
+  # The `start_date` variable will be accessible in all resources
+  start_date: '2020-01-01'
+  # State filter for geographic analysis
+  target_state: 'UT'
+  # Price range filters
+  min_property_price: 10000
+  max_property_price: 800000
+
+# Configuring models
+# Full documentation: https://docs.getdbt.com/docs/configuring-models
+
+models:
+  real_estate_dbt:
+    # Raw data layer - source data with minimal transformation
+    01_raw:
+      +materialized: view
+      +docs:
+        node_color: "#8B4513"  # Brown for raw data
+      +meta:
+        layer: "raw"
+        owner: "data_engineering"
+        description: "Raw data ingestion with basic filtering and deduplication"
+        
+    # Building proximity analysis
+    02_closest_buildings:
+      +materialized: view
+      +docs:
+        node_color: "#4169E1"  # Royal blue for proximity analysis
+      +meta:
+        layer: "proximity_analysis"
+        owner: "data_engineering"
+        description: "Spatial analysis for finding closest buildings and properties"
+        
+    # Staging layer - cleaned and standardized data
+    03_staging:
+      +materialized: view
+      +docs:
+        node_color: "#32CD32"  # Lime green for staging
+      +meta:
+        layer: "staging"
+        owner: "data_engineering"
+        description: "Cleaned, standardized, and validated data ready for analysis"
+        
+    # Units historical analysis
+    04_units_history:
+      +materialized: view
+      +docs:
+        node_color: "#FF6347"  # Tomato for historical data
+      +meta:
+        layer: "historical_analysis"
+        owner: "analytics"
+        description: "Time-series analysis of unit pricing and availability"
+        
+    # Prediction and forecasting models
+    05_prediction_analysis:
+      +materialized: table
+      +docs:
+        node_color: "#9932CC"  # Dark orchid for predictions
+      +meta:
+        layer: "prediction"
+        owner: "data_science"
+        description: "Predictive models and forecasting analysis"
+        
+    # Building summary metrics
+    06_property_summaries:
+      +materialized: view
+      +docs:
+        node_color: "#FF8C00"  # Dark orange for summaries
+      +meta:
+        layer: "aggregation"
+        owner: "analytics"
+        description: "Aggregated building-level metrics and KPIs"
+        
+    # Research and study datasets
+    07_points_of_study:
+      +materialized: table
+      +docs:
+        node_color: "#DC143C"  # Crimson for research
+      +meta:
+        layer: "research"
+        owner: "research_team"
+        description: "Curated datasets for specific research questions and studies"
+        
+    # Final analytical tables
+    08_main_tables:
+      +materialized: table
+      +docs:
+        node_color: "#228B22"  # Forest green for final outputs
+      +meta:
+        layer: "presentation"
+        owner: "analytics"
+        description: "Final analytical tables optimized for reporting and dashboards"
+
+    09_expanded_main_tables:
+      +materialized: view
+      +docs:
+        node_color: "#FF8C00"  # Forest green for final outputs
+      +meta:
+        layer: "aggregation"
+        owner: "analytics"
+        description: "General statistics about to help estimating profitability"
+
+    10_business_potential:
+      +materialized: view
+      +docs:
+        node_color: "#228B22"  # Forest green for final outputs
+      +meta:
+        layer: "presentation"
+        owner: "analytics"
+        description: "Final tables for showing profitability of different options"
+
+# Snapshot configurations
+snapshots:
+  real_estate_dbt:
+    +target_schema: snapshots
+    +strategy: timestamp
+    +updated_at: updated_at
+
+# Test configurations
+tests:
+  real_estate_dbt:
+    +store_failures: true
+    +schema: test_failures
+
