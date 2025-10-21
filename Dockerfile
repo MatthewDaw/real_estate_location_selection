@@ -23,8 +23,8 @@ ENV PYTHONIOENCODING=utf-8
 COPY pyproject.toml uv.lock* ./
 
 # Create a minimal src directory structure for dependency installation
-RUN mkdir -p src/real_estate_location_selection src/pipelines && \
-    touch src/real_estate_location_selection/__init__.py src/pipelines/__init__.py
+RUN mkdir -p src/scrapers src/pipelines && \
+    touch src/scrapers/__init__.py src/pipelines/__init__.py
 
 # Copy README for setuptools
 COPY README.md ./
